@@ -39,6 +39,7 @@
 #include "screen.h"
 #include "dinvram.h"
 #include "machine/nvram.h"
+#include "imagedev/floppy.h"
 #include "ioprocs.h"
 #include "ioprocsvec.h"
 #include "sound.h"
@@ -1531,6 +1532,17 @@ extern "C" int mame_save_count(void)
 		util::vector_read_write_adapter<uint8_t> file(f.bytes);
 		if (nvram.nvram_save(file) && !f.bytes.empty())
 			s_saves_out.push_back(std::move(f));
+	}
+	// and every disk the machine wrote to, in a drive or taken out, by the name
+	// of its file, as an Extended DSK file (patch 0012): taken back as a game
+	// file of a new project, it is the disk as the machine left it
+	for (auto &disk : chimera_written_disks(s_machine->root_device()))
+	{
+		save_file f;
+		f.name = disk.first;
+		if (auto const slash = f.name.find_last_of("/\\"); slash != std::string::npos) f.name.erase(0, slash + 1);
+		f.bytes = std::move(disk.second);
+		s_saves_out.push_back(std::move(f));
 	}
 	return int(s_saves_out.size());
 }

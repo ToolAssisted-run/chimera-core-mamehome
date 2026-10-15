@@ -6,6 +6,8 @@ and an input log in the machine's own control names.
 usage: make-project.py <package> <out.chimeraProject> <frames>
                        machine=<name> [<setting>=<value> ...]
                        [press=<control>:<first>:<count> ...] [panel=<file>]
+                       [pressfile=<file>]
+                       (a control may be pressed more than once)
                        -- <slot=file> [<slot=file> ...]
 
 The machine is one of the Machine setting's (machines.txt). A setting is one
@@ -70,7 +72,14 @@ def main():
     overrides = []
     for o in options:
         k, v = o.split("=", 1)
-        if k == "panel":
+        if k == "pressfile":
+            # presses one a line, "<control>:<first>:<count>" (a control's name
+            # may have spaces and quotes in it)
+            for line in open(v):
+                if line.strip():
+                    control, first, count = line.rstrip("\n").rsplit(":", 2)
+                    presses.setdefault(control, []).append((int(first), int(count)))
+        elif k == "panel":
             # a movie carries only the controls the machine has live: the
             # output of the test harness's --list-panel for the same settings
             live, live_axes = set(), set()
@@ -84,7 +93,7 @@ def main():
             axes = [a for i, a in enumerate(axes) if i in live_axes]
         elif k == "press":
             control, first, count = v.rsplit(":", 2)
-            presses[control] = (int(first), int(count))
+            presses.setdefault(control, []).append((int(first), int(count)))
         else:
             overrides.append((k, v))
 
@@ -108,8 +117,8 @@ def main():
                     row += "%5d," % a.get("neutral", 0)
             for b in buttons:
                 if player_of(b) == g:
-                    first, count = presses.get(b, (0, 0))
-                    row += "X" if first <= f < first + count else "."
+                    held = any(first <= f < first + count for first, count in presses.get(b, []))
+                    row += "X" if held else "."
         rows.append(row + "|")
     log = "[Input]\nLogKey:" + key + "\n" + "\n".join(rows) + "\n[/Input]\n"
 

@@ -373,6 +373,76 @@ if [ -f "$roms/cpc/settings" ]; then
 	stream "$work/cpcd-swap.n" > "$work/cpcd-swap.ns"; stream "$work/cpcd-swap.w" > "$work/cpcd-swap.ws"; stream "$work/cpcd-swap.rr" > "$work/cpcd-swap.rrs"
 	check "cpc: swaps run the same in the sandbox and with a state saved and loaded every frame" "" \
 		sh -c "cmp -s '$work/cpcd-swap.ns' '$work/cpcd-swap.ws' && cmp -s '$work/cpcd-swap.ws' '$work/cpcd-swap.rrs' && [ -s '$work/cpcd-swap.ws' ]"
+	# Export Save Data hands out each disk the machine wrote to - in the drive
+	# or taken out - under its own name, as an Extended DSK; taken back as the
+	# game of a new project it is the disk as the machine left it
+	mkdir -p "$work/cpcd-x1" "$work/cpcd-x2" "$work/cpcd-x0"
+	# shellcheck disable=SC2046
+	"$wbxrun" "$core" "$work/cpcd" --frames 600 --report 600 $(keys 150 'save"x"\n') --savedata-out "$work/cpcd-x1" > /dev/null 2>&1 || true
+	# shellcheck disable=SC2046
+	"$wbxrun" "$core" "$work/cpcd" --frames 700 --report 700 $(keys 150 'save"x"\n') $(keys 600 '{Next Disk}') --savedata-out "$work/cpcd-x2" > /dev/null 2>&1 || true
+	# shellcheck disable=SC2046
+	"$wbxrun" "$core" "$work/cpcd" --frames 600 --report 600 $(keys 150 'cat\n') --savedata-out "$work/cpcd-x0" > /dev/null 2>&1 || true
+	check "cpc: Export Save Data hands out the disk written to, and only that" "$(ls "$work/cpcd-x1" | tr '\n' ' ')" \
+		sh -c "[ \"\$(ls '$work/cpcd-x1')\" = one.dsk ] && [ \"\$(ls '$work/cpcd-x2')\" = one.dsk ] && [ -z \"\$(ls '$work/cpcd-x0')\" ]"
+	check "cpc: the exported disk is the given one except where the machine wrote" "every track but the directory's the same, sector by sector" \
+		python3 - "$work/cpcd/one.dsk" "$work/cpcd-x1/one.dsk" <<'PY'
+import sys
+def sectors(path):
+    d = open(path, "rb").read()
+    ext = d.startswith(b"EXTENDED")
+    tracks, sides = d[48], d[49]
+    out, at = {}, 256
+    for t in range(tracks * sides):
+        size = d[52 + t] * 256 if ext else d[50] | d[51] << 8
+        if not size: continue
+        b = d[at:at + size]
+        n, at2 = b[21], 256 * ((0x18 + 8 * b[21] + 255) // 256)
+        for i in range(n):
+            e = b[0x18 + 8 * i:0x18 + 8 * i + 8]
+            length = (e[6] | e[7] << 8) if ext else 128 << e[3]
+            out[(e[0], e[1], e[2])] = (bytes(b[at2:at2 + length]), e[4], e[5])
+            at2 += length
+        at += size
+    return out
+a, b = sectors(sys.argv[1]), sectors(sys.argv[2])
+assert set(a) == set(b), "the sectors differ"
+assert all(st1 == 0 and st2 == 0 for _, st1, st2 in b.values()), "an error status"
+changed = [k for k in a if a[k][0] != b[k][0]]
+assert changed and all(k[0] == 0 for k in changed), changed
+PY
+	mkdir -p "$work/cpcd-back"
+	cp "$work/cpcd"/*.rom "$work/cpcd-back/"; cp "$work/cpcd-x1/one.dsk" "$work/cpcd-back/"
+	printf '{"machine":"cpc6128"}' > "$work/cpcd-back/settings"; printf '{"game":["one.dsk"]}' > "$work/cpcd-back/slots"
+	rm -rf "$work/cpcd-back.dom"; mkdir -p "$work/cpcd-back.dom"
+	# shellcheck disable=SC2046
+	"$wbxrun" "$core" "$work/cpcd-back" --frames 500 --report 500 $(keys 150 'cat\n') --dump-domains "$work/cpcd-back.dom" > /dev/null 2>&1 || true
+	check "cpc: the exported disk, taken back as a game, has the saved file" "CAT lists X.BAS" \
+		sh -c "cat '$work/cpcd-back.dom'/*RAM* | grep -q -a 'X       BAS'"
+	# the same through Chimera's engine: a project whose movie types SAVE"X",
+	# and Export Save Data at its end
+	if [ -x "$run" ] && [ -f "$pkg" ]; then
+		keys 150 'save"x"\n' | python3 -c "
+import re, sys
+names = {}
+for line in open(sys.argv[1]):
+    m = re.match(r\"panel (\\d+) '(.*)' \", line)
+    if m: names[m.group(1)] = m.group(2)
+for i, f in re.findall(r'--press (\\d+):(\\d+):4', sys.stdin.read()):
+    print('%s:%s:4' % (names[i], f))" "$work/cpcd.panel" > "$work/cpcd-engine.presses"
+		mkdir -p "$work/cpcd-engine" "$work/cpcd-engine.out"
+		cp "$work/cpcd/one.dsk" "$work/cpcd/two.dsk" "$work/cpcd-engine/"
+		python3 "$root/tests/make-project.py" "$pkg" "$work/cpcd-engine/cpc.chimeraProject" 600 machine=cpc6128 \
+			"pressfile=$work/cpcd-engine.presses" "panel=$work/cpcd.panel" \
+			-- "game=$work/cpcd-engine/one.dsk" "game=$work/cpcd-engine/two.dsk" > "$work/cpcd-engine.log" 2>&1 || true
+		"$run" --project "$work/cpcd-engine/cpc.chimeraProject" "$pkg" --files "$work/cpcd-engine" \
+			--firmware "cpc6128.rom=$work/cpcd/cpc6128.rom" --firmware "cpcados.rom=$work/cpcd/cpcados.rom" \
+			--export-savedata "$work/cpcd-engine.out" >> "$work/cpcd-engine.log" 2>&1 || true
+		check "cpc: Chimera's engine exports the disk a project's movie saved to" "$(ls "$work/cpcd-engine.out" | tr '\n' ' ')" \
+			sh -c "[ -f '$work/cpcd-engine.out/one.dsk' ] && cmp -s '$work/cpcd-engine.out/one.dsk' '$work/cpcd-x1/one.dsk'"
+	else
+		report SKIP "cpc: Chimera's engine exports the disk a project's movie saved to" "no chimera-run or package"
+	fi
 	# nothing is written to the files the machine was given
 	check "cpc: the disk files given are never written" "" \
 		sh -c "python3 '$root/tests/make-dsk.py' '$work/one.check' ONE > /dev/null && cmp -s '$work/one.check' '$work/cpcd/one.dsk'"

@@ -101,12 +101,23 @@ users have (the owner's folder has 1.02 to 1.08).
   "writing back" a format it cannot write.
 - A file AMSDOS saves is renamed from X.$$$ to X.BAS a few seconds after
   "Ready"; a disk taken out before that keeps X.$$$, as a real one would.
+- Export Save Data (owner, 2026-10-15: "add export of changed disks as save
+  data") hands out each disk the machine wrote to - in a drive or taken out
+  - under its own name, as an Extended DSK file, after any NVRAM files.
+  MAME reads but cannot write the CPC's DSK formats, so patch 0012 writes
+  it: each track's sectors decoded from the disk's MFM cells by MAME's own
+  scan, in the order they pass the head, with their IDs, and a deleted-data
+  mark or a data CRC error in each sector's status bytes. A first decoder of
+  my own misread the last sector of one track (a test that compares every
+  sector with the original found it); the second follows MAME's scan and
+  pairs each ID with its data across the index. Taking the disk back is a
+  new project with it as the game, as the VICE core does.
 
 ## Measured (2026-10-15)
 
 - MAME's libraries: about 5 minutes a flavor on 14 processors. `core.wbx` is
   67 MB.
-- The test script: 73 passed, 0 failed, 0 skipped, with the local folders.
+- The test script: 77 passed, 0 failed, 0 skipped, with the local folders.
   - The package is what the walk gives (24 machines, 18 settings, 30
     firmware files), and Chimera's own package checks pass (18).
   - The GX4000, on a cartridge the test writes (`tests/make-cpr.py`): it
@@ -128,6 +139,12 @@ users have (the owner's folder has 1.02 to 1.08).
     the same in the reference, the sandbox and with a state saved and
     loaded every frame; the disk files given are never written. A planted
     fault (Next Disk putting the same disk back) failed two of these tests.
+    After SAVE"X", Export Save Data hands out one.dsk and nothing else (and
+    nothing after a run that wrote nothing, one.dsk too after the disk was
+    swapped out); every sector of it but the directory track's is the
+    original's, none with an error status; taken back as a game, CAT lists
+    X.BAS; Chimera's engine (chimera-run --export-savedata) on a project
+    whose movie types SAVE"X" exports the same bytes.
     On Windows, a project's Next Disk and CAT give Linux's picture.
   - The TI-83 (OS 1.08): a program file the test writes
     (tests/make-83p.py) goes over the link cable; its tokens and its
@@ -173,7 +190,6 @@ the CPC runs BASIC. The TI-83's OS 1.02 to 1.08 match MAME's.
 
 ## Not done
 
-- A changed disk is not handed out by Export Save Data.
 - Chimera's window on Windows not tried (only its headless runner).
 - Not published: a repository, CI, the roster and the README rows are the
   owner's to decide.

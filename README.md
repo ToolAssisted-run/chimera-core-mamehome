@@ -74,7 +74,9 @@ Previous Disk put the next or the previous disk of the project's list into
 drive A (round the end of the list), and Eject Disk leaves the drive empty.
 It starts with the first disk in. What a program writes to a disk stays with
 that disk when it comes out and goes back, and is part of a savestate; the
-project's own files are never written.
+project's own files are never written. Export Save Data hands out each disk
+the machine wrote to, under its own name, as an Extended DSK file; a new
+project that takes it as its game starts with the disk as it was left.
 
 ## Settings
 

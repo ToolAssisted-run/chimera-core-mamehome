@@ -1,6 +1,34 @@
+--- a/src/devices/imagedev/floppy.h
++++ b/src/devices/imagedev/floppy.h
+@@ -45,6 +45,13 @@
+ 							public device_image_interface
+ {
+ public:
++#if defined(CHIMERA_CORE)
++	// chimera: whether the disk in the drive was written to since it was first
++	// put in (it keeps that when it is taken out and put back), and its image
++	bool m_chimera_written = false;
++	const floppy_image *chimera_image() const { return m_image.get(); }
++#endif
++
+ 	typedef delegate<void (floppy_image_device *)> load_cb;
+ 	typedef delegate<void (floppy_image_device *)> unload_cb;
+ 	typedef delegate<void (floppy_image_device *, int)> index_pulse_cb;
+@@ -461,4 +468,11 @@
+ extern template class device_finder<floppy_connector, false>;
+ extern template class device_finder<floppy_connector, true>;
+ 
++#if defined(CHIMERA_CORE)
++// chimera: every disk of the machine that was written to - in a drive or
++// taken out - by the name of its file, as an Extended DSK file (the CPC's
++// format, which MAME reads but cannot write): what Export Save Data hands out
++std::vector<std::pair<std::string, std::vector<uint8_t>>> chimera_written_disks(device_t &root);
++#endif
++
+ #endif // MAME_IMAGEDEV_FLOPPY_H
 --- a/src/devices/imagedev/floppy.cpp
 +++ b/src/devices/imagedev/floppy.cpp
-@@ -17,6 +17,18 @@
+@@ -17,6 +17,184 @@
  #include "formats/mfi_dsk.h"
  #include "formats/td0_dsk.h"
  #include "formats/cqm_dsk.h"
@@ -13,20 +41,187 @@
 +// formats (a CPC's DSK) cannot be written, so the changes would be lost the
 +// moment the disk came out. Here a disk's image is kept when it comes out, by
 +// the name of its file, and putting that file in again takes the kept image. It is in
-+// the machine's memory, so a savestate holds it.
-+static std::map<std::string, std::unique_ptr<floppy_image>> s_chimera_kept_disks;
++// the machine's memory, so a savestate holds it. A disk written to is also
++// handed out, as an Extended DSK file, by chimera_written_disks.
++struct chimera_kept_disk { std::unique_ptr<floppy_image> image; bool written; };
++static std::map<std::string, chimera_kept_disk> s_chimera_kept_disks;
++
++namespace {
++
++// A disk image as an Extended DSK file: each track's sectors decoded from its
++// MFM cells in the order they pass the head, with their IDs (C, H, R, N), a
++// deleted-data mark and a data CRC error kept in the sector's status bytes,
++// so a copy-protected disk survives as well as a plain one.
++class chimera_edsk : public floppy_image_format_t
++{
++public:
++	static std::vector<uint8_t> encode(const floppy_image &image)
++	{
++		int tracks, heads;
++		image.get_actual_geometry(tracks, heads);
++		heads = std::max(heads, 1);
++		tracks = std::min(tracks, 204 / heads);
++		std::vector<std::vector<uint8_t>> blocks;
++		int used = 0;
++		for (int t = 0; t < tracks; t++)
++			for (int h = 0; h < heads; h++)
++			{
++				blocks.push_back(image.track_is_formatted(t, h) ? track_block(t, h, image) : std::vector<uint8_t>());
++				if (!blocks.back().empty()) used = t + 1;
++			}
++		std::vector<uint8_t> out(256, 0);
++		std::memcpy(out.data(), "EXTENDED CPC DSK File\r\nDisk-Info\r\n", 34);
++		std::memcpy(out.data() + 34, "Chimera       ", 14);
++		out[48] = uint8_t(used);
++		out[49] = uint8_t(heads);
++		for (int i = 0; i < used * heads; i++)
++		{
++			out[52 + i] = uint8_t(blocks[i].size() / 256);
++			out.insert(out.end(), blocks[i].begin(), blocks[i].end());
++		}
++		return out;
++	}
++
++private:
++	struct sector { uint8_t c, h, r, n, st1, st2; std::vector<uint8_t> data; };
++
++	static uint16_t crc(uint16_t value, uint8_t byte)
++	{
++		value ^= uint16_t(byte) << 8;
++		for (int i = 0; i < 8; i++)
++			value = (value & 0x8000) ? uint16_t((value << 1) ^ 0x1021) : uint16_t(value << 1);
++		return value;
++	}
++
++	static std::vector<uint8_t> track_block(int track, int head, const floppy_image &image)
++	{
++		// double density: 2 microseconds a cell
++		std::vector<bool> const bits = generate_bitstream_from_track(track, head, 2000, image);
++		uint32_t const n = uint32_t(bits.size());
++		if (n < 1000) return {};
++		// MAME's own scan (extract_sectors_from_bitstream_mfm_pc): every ID
++		// block and data block, by the sync marks before them, the 16 cells
++		// before the index read first so a mark across it is found
++		std::vector<uint32_t> ids;
++		std::vector<std::pair<uint32_t, uint8_t>> datas;   // where the data starts, and its mark
++		uint16_t shift = 0;
++		for (uint32_t i = 0; i < 16; i++)
++			if (bits[n - 16 + i]) shift |= 0x8000 >> i;
++		for (uint32_t i = 0; i < n; i++)
++		{
++			shift = uint16_t((shift << 1) | (bits[i] ? 1 : 0));
++			if (shift != 0x4489) continue;
++			uint16_t header;
++			uint32_t pos = i + 1;
++			do
++			{
++				header = 0;
++				for (int j = 0; j < 16; j++)
++				{
++					// a cell, and on to the next (round the index), as MAME's sbit_rp
++					if (bits[pos]) header |= 0x8000 >> j;
++					if (++pos == n) pos = 0;
++				}
++			} while (header == 0x4489 && pos > i);
++			uint8_t mark = 0;
++			switch (header)
++			{
++			case 0x5554: case 0x5555: mark = 0xfe; break;
++			case 0x554a: mark = 0xf8; break;
++			case 0x5549: mark = 0xf9; break;
++			case 0x5544: mark = 0xfa; break;
++			case 0x5545: mark = 0xfb; break;
++			default: break;
++			}
++			if (!mark) continue;
++			if (mark == 0xfe) ids.push_back(pos); else datas.emplace_back(pos, mark);
++			if (pos <= i) break;    // a mark across the index: the turn is done
++			i = pos - 1;
++		}
++		std::vector<sector> sectors;
++		for (uint32_t id : ids)
++		{
++			uint32_t pos = id;
++			sector sec;
++			sec.c = sbyte_mfm_r(bits, pos); sec.h = sbyte_mfm_r(bits, pos);
++			sec.r = sbyte_mfm_r(bits, pos); sec.n = sbyte_mfm_r(bits, pos);
++			sec.st1 = 0x01;    // no data mark, unless one is found
++			sec.st2 = 0x01;
++			// its data: the data block 704 cells on (1008 in perpendicular
++			// format), give or take 128, as MAME pairs them - round the index
++			for (auto const &d : datas)
++			{
++				uint32_t const delta = (d.first + n - id) % n;
++				if (delta < 704 - 128 || delta > 1008 + 128) continue;
++				size_t const length = size_t(128) << std::min<int>(sec.n, 6);
++				uint32_t p = d.first;
++				uint16_t c = 0xffff;
++				for (int k = 0; k < 3; k++) c = crc(c, 0xa1);
++				c = crc(c, d.second);
++				sec.data.resize(length);
++				for (size_t k = 0; k < length; k++) { sec.data[k] = sbyte_mfm_r(bits, p); c = crc(c, sec.data[k]); }
++				c = crc(c, sbyte_mfm_r(bits, p));
++				c = crc(c, sbyte_mfm_r(bits, p));
++				sec.st1 = c ? 0x20 : 0x00;                                           // data error
++				sec.st2 = uint8_t((c ? 0x20 : 0x00) | (d.second == 0xf8 ? 0x40 : 0x00));   // and a deleted mark
++				break;
++			}
++			sectors.push_back(std::move(sec));
++		}
++		if (sectors.empty()) return {};
++		size_t const info = (0x18 + 8 * sectors.size() + 255) & ~size_t(255);
++		std::vector<uint8_t> block(info, 0);
++		std::memcpy(block.data(), "Track-Info\r\n", 12);
++		block[16] = uint8_t(track);
++		block[17] = uint8_t(head);
++		block[20] = sectors[0].n;
++		block[21] = uint8_t(sectors.size());
++		block[22] = 0x4e;
++		block[23] = 0xe5;
++		for (size_t k = 0; k < sectors.size(); k++)
++		{
++			sector const &sec = sectors[k];
++			uint8_t *e = block.data() + 0x18 + 8 * k;
++			e[0] = sec.c; e[1] = sec.h; e[2] = sec.r; e[3] = sec.n; e[4] = sec.st1; e[5] = sec.st2;
++			e[6] = uint8_t(sec.data.size()); e[7] = uint8_t(sec.data.size() >> 8);
++		}
++		for (sector const &sec : sectors)
++			block.insert(block.end(), sec.data.begin(), sec.data.end());
++		block.resize((block.size() + 255) & ~size_t(255), 0);
++		return block;
++	}
++};
++
++} // anonymous namespace
++
++std::vector<std::pair<std::string, std::vector<uint8_t>>> chimera_written_disks(device_t &root)
++{
++	std::map<std::string, const floppy_image *> written;
++	for (auto const &kept : s_chimera_kept_disks)
++		if (kept.second.written && kept.second.image) written[kept.first] = kept.second.image.get();
++	// every kind of drive (a CPC's 3-inch drive is a type of its own)
++	for (device_t &device : device_enumerator(root))
++		if (auto *const drive = dynamic_cast<floppy_image_device *>(&device))
++			if (drive->exists() && drive->m_chimera_written && drive->chimera_image())
++				written[drive->filename()] = drive->chimera_image();
++	std::vector<std::pair<std::string, std::vector<uint8_t>>> out;
++	for (auto const &w : written)
++		out.emplace_back(w.first, chimera_edsk::encode(*w.second));
++	return out;
++}
 +#endif
  #include "formats/dsk_dsk.h"
  #include "formats/pc_dsk.h"
  #include "formats/ipf_dsk.h"
-@@ -685,6 +697,23 @@
+@@ -685,6 +863,25 @@
  
  std::pair<std::error_condition, std::string> floppy_image_device::call_load()
  {
 +#if defined(CHIMERA_CORE)
 +	if (auto kept = s_chimera_kept_disks.find(filename()); kept != s_chimera_kept_disks.end())
 +	{
-+		m_image = std::move(kept->second);
++		m_image = std::move(kept->second.image);
++		m_chimera_written = kept->second.written;
 +		s_chimera_kept_disks.erase(kept);
 +		// any format of the file's kind: only whether one exists is asked
 +		m_output_format = nullptr;
@@ -39,11 +234,12 @@
 +			m_cur_load_cb(this);
 +		return std::make_pair(std::error_condition(), std::string());
 +	}
++	m_chimera_written = false;
 +#endif
  	check_for_file();
  	auto io = util::random_read_fill(image_core_file(), 0xff);
  	if(!io)
-@@ -737,8 +766,20 @@
+@@ -737,8 +934,21 @@
  	m_dskchg = 0;
  
  	if (m_image) {
@@ -56,7 +252,8 @@
 +		// kept whether or not it looks changed: MAME clears "changed" when the
 +		// motor stops and it has written the disk back, which for a format it
 +		// cannot write is nothing at all
-+		s_chimera_kept_disks[filename()] = std::move(m_image);
++		s_chimera_kept_disks[filename()] = chimera_kept_disk{ std::move(m_image), m_chimera_written };
++		m_chimera_written = false;
 +#else
  		if(m_image_dirty)
  			commit_image();
@@ -64,3 +261,23 @@
  		m_image.reset();
  	}
  
+@@ -1276,6 +1486,9 @@
+ 	m_write_start_time = when;
+ 	m_write_transition_times.clear();
+ 	m_image_dirty = true;
++#if defined(CHIMERA_CORE)
++	m_chimera_written = true;
++#endif
+ 	m_track_dirty = true;
+ }
+ 
+@@ -1483,6 +1696,9 @@
+ 		if(m_writing)
+ 			write_do_flush(when);
+ 		m_image_dirty = true;
++#if defined(CHIMERA_CORE)
++		m_chimera_written = true;
++#endif
+ 		attotime base;
+ 		int splice_pos = find_position(base, when);
+ 		m_image->set_write_splice_position(m_cyl, m_ss, splice_pos, m_subcyl);
