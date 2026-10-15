@@ -75,6 +75,18 @@ TI calculators (see "Not done").
     and a state moved to a new sandbox, change nothing.
   - The Intellivision with a firmware file taken out is refused, naming the
     file; its disc is sixteen buttons or two axes as its set-up switch says.
+- Through Chimera's engine (chimera-run), as projects with movies: the
+  GX4000 cartridge with P1 Up held reads its joystick row as held, and as
+  free with an idle movie; Astrosmash with its firmware starts when the
+  movie presses Enter.
+- In Chimera's window (tests/run-frontend.sh, 4 passed): the GX4000
+  cartridge runs 300 frames and its RAM is the headless runner's; the
+  package's keys become Chimera's; the Intellivision without its firmware
+  is refused, naming exec.bin; with the firmware in Chimera's configuration
+  Astrosmash's RAM is the headless runner's.
+- Windows (chimera-run.exe, cross-built from Chimera): the GX4000 project's
+  RAM and picture, and the Astrosmash project's picture, are byte for byte
+  Linux's.
 - Two faults planted on purpose were caught: two controls swapped in the
   package (two tests failed), and two controls swapped in the core (the
   wiring test failed).
@@ -96,8 +108,6 @@ TI calculators (see "Not done").
   to it from a file (BizHawk does it through its link cable). It needs a
   link device of our own that sends a `.83p` file.
 - A CPC disk is not swapped while the machine runs (Previous/Next Disk).
-- Chimera's window test (`tests/run-frontend.sh` in the arcade core) is not
-  adapted yet.
-- Windows not tried yet.
+- Chimera's window on Windows not tried (only its headless runner).
 - Not published: a repository, CI, the roster and the README rows are the
   owner's to decide.

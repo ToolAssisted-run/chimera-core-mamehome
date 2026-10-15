@@ -9,7 +9,7 @@ name: chimera waterbox core
 # their firmware, which is not ours to put on a public runner; their tests
 # say SKIP here and run where the firmware is (tests/roms-local), before
 # anything is pushed. The package is checked against MAME's own database and
-# against Chimera's checks.
+# against Chimera's checks, and opened in Chimera's window.
 #
 # MAME is built twice (for the host and for the sandbox), seven driver files
 # and what they need: about 5 minutes each on 14 processors.
@@ -127,6 +127,12 @@ jobs:
           dotnet test source/gui/Chimera.Tests.Client.Common/Chimera.Tests.Client.Common.csproj \
             -c Release --nologo \
             --filter "FullyQualifiedName~InstalledCorePackagesTests|FullyQualifiedName~MnemonicUniquenessTests"
+
+      - name: The package in Chimera's window
+        # Chimera.exe under Mono on a private display: the GX4000 test
+        # cartridge runs and leaves the headless runner's memory, and the
+        # keys the package ships become Chimera's
+        run: bash tests/run-frontend.sh --chimera-root "$PWD/chimera-checkout"
 
       - name: Publish the core package
         uses: actions/upload-artifact@v7
