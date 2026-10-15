@@ -36,8 +36,9 @@ was measured and what is not done. The arcade core
   `default_keybinds.json` (both committed) from the walk, with
   `waterbox.template.json` for what every machine shares.
 - `waterbox/run-gate.sh` - the test script. `tests/make-cpr.py`,
-  `make-a78.py`, `make-o2.py`, `make-83p.py` - the test cartridges and the
-  TI-83 test program. `tests/run-frontend.sh` - the window test.
+  `make-a78.py`, `make-o2.py`, `make-83p.py`, `make-dsk.py` - the test
+  cartridges, the TI-83 test program and the CPC test disks;
+  `type-keys.py` types text on a CPC's keyboard. `tests/run-frontend.sh` - the window test.
 - `waterbox/libco/` - ares's libco. `guest-shim/`, `native-shim/` - headers.
 - `waterbox/bin/`, `build/` - build output (ignored by git).
 - `tests/roms-local/` - a folder per machine with its firmware and a game,
@@ -124,5 +125,9 @@ in the commit what ran, with the numbers. Chimera's own package checks need
 - A patch that adds files is regenerated with `diff -uN` per file; a shell
   script with `set -e` stops at the first `diff`, which exits 1 when files
   differ, and leaves a patch with only its first file.
+- A disk control does its swap at the start of the next frame, inside
+  MAME's turn (chimera_osd::update), never from the host's stack.
+- MAME clears a disk's "changed" flag when its motor stops, even for a
+  format it cannot write: patch 0012 keeps every disk taken out.
 - MAME reads every port once a frame for itself. Patch 0005 leaves those
   reads out, or no frame would ever count as a lag frame.

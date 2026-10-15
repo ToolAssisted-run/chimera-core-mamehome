@@ -1,0 +1,131 @@
+--- a/src/osd/modules/file/posixfile.cpp
++++ b/src/osd/modules/file/posixfile.cpp
+@@ -47,10 +47,12 @@
+ #include "osdcore.h"
+ #include "unicode.h"
+ 
++#include <algorithm>
+ #include <cassert>
+ #include <cerrno>
+ #include <cstdlib>
+ #include <cstring>
++#include <map>
+ #include <memory>
+ #include <type_traits>
+ #include <vector>
+@@ -165,6 +167,100 @@
+ };
+ 
+ 
++#if defined(CHIMERA_CORE)
++//============================================================
++//  chimera: files written in memory
++//============================================================
++
++// Every file MAME opens for writing - a disk a game saves to, a tape - is a
++// copy in memory of the file it names, and every later open of that name is
++// the copy. So nothing is ever written to a file: the sandbox's files are
++// read-only, and a reference run outside it must not change the files it is
++// given either; both see the same writable disk; and a savestate, which is
++// the sandbox's memory, holds what the machine wrote.
++std::map<std::string, std::shared_ptr<std::vector<std::uint8_t>>> s_memory_files;
++
++class chimera_memory_file : public osd_file
++{
++public:
++	chimera_memory_file(std::shared_ptr<std::vector<std::uint8_t>> data) noexcept : m_data(std::move(data)) { }
++
++	virtual std::error_condition read(void *buffer, std::uint64_t offset, std::uint32_t count, std::uint32_t &actual) noexcept override
++	{
++		actual = 0;
++		if (offset < m_data->size())
++		{
++			actual = std::uint32_t(std::min<std::uint64_t>(count, m_data->size() - offset));
++			std::memcpy(buffer, m_data->data() + offset, actual);
++		}
++		return std::error_condition();
++	}
++
++	virtual std::error_condition write(void const *buffer, std::uint64_t offset, std::uint32_t count, std::uint32_t &actual) noexcept override
++	{
++		try
++		{
++			if (offset + count > m_data->size()) m_data->resize(offset + count);
++		}
++		catch (...) { return std::errc::not_enough_memory; }
++		std::memcpy(m_data->data() + offset, buffer, count);
++		actual = count;
++		return std::error_condition();
++	}
++
++	virtual std::error_condition truncate(std::uint64_t offset) noexcept override
++	{
++		try { m_data->resize(offset); }
++		catch (...) { return std::errc::not_enough_memory; }
++		return std::error_condition();
++	}
++
++	virtual std::error_condition flush() noexcept override { return std::error_condition(); }
++
++private:
++	std::shared_ptr<std::vector<std::uint8_t>> m_data;
++};
++
++// the copy in memory for an open of this path, made the first time the file
++// is opened for writing; false when the open is the real file's (a file read
++// that was never written)
++bool chimera_open_in_memory(std::string const &path, std::uint32_t openflags, osd_file::ptr &file, std::uint64_t &filesize, std::error_condition &err) noexcept
++{
++	try
++	{
++		auto found = s_memory_files.find(path);
++		if (found == s_memory_files.end())
++		{
++			if (!(openflags & OPEN_FLAG_WRITE)) return false;
++			auto data = std::make_shared<std::vector<std::uint8_t>>();
++			if (!(openflags & OPEN_FLAG_CREATE))
++			{
++				// the file as it is, read once
++				osd_file::ptr real;
++				std::uint64_t size = 0;
++				err = osd_file::open(path, OPEN_FLAG_READ, real, size);
++				if (err) return true;
++				data->resize(size);
++				std::uint32_t got = 0;
++				if (size && (err = real->read(data->data(), 0, std::uint32_t(size), got))) return true;
++				data->resize(got);
++			}
++			found = s_memory_files.emplace(path, std::move(data)).first;
++		}
++		else if ((openflags & OPEN_FLAG_WRITE) && (openflags & OPEN_FLAG_CREATE))
++			found->second->clear();
++		file = std::make_unique<chimera_memory_file>(found->second);
++		filesize = found->second->size();
++		err = std::error_condition();
++	}
++	catch (...)
++	{
++		err = std::errc::not_enough_memory;
++	}
++	return true;
++}
++#endif
++
+ //============================================================
+ //  is_path_separator
+ //============================================================
+@@ -232,6 +328,14 @@
+ 	else if (posix_check_domain_path(path))
+ 		return posix_open_domain(path, openflags, file, filesize);
+ 
++#if defined(CHIMERA_CORE)
++	{
++		std::error_condition err;
++		if (chimera_open_in_memory(path, openflags, file, filesize, err))
++			return err;
++	}
++#endif
++
+ 	// select the file open modes
+ 	int access;
+ 	if (openflags & OPEN_FLAG_WRITE)

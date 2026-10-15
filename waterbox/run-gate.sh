@@ -325,6 +325,58 @@ sys.exit(0 if d.find(bytes.fromhex('de34323432')) >= 0 and d.find(b'AREMIHC') >=
 	fi
 	check "ti83: run by its keys, it changes the screen" "PRGM, ENTER, ENTER" differ "$work/ti83.vid" "$work/ti83-nofile.vid"
 fi
+# The CPC's disks: two disks the test writes (tests/make-dsk.py), one file
+# on each, in one list for drive A. What CAT read is in AMSDOS's directory
+# buffer in RAM ("ONE     TXT"), so the RAM after a run says which disk was
+# in. Typed with tests/type-keys.py.
+if [ -f "$roms/cpc/settings" ]; then
+	copy_folder "$roms/cpc" cpcd
+	python3 "$root/tests/make-dsk.py" "$work/cpcd/one.dsk" ONE > /dev/null
+	python3 "$root/tests/make-dsk.py" "$work/cpcd/two.dsk" TWO > /dev/null
+	printf '{"game":["one.dsk","two.dsk"]}' > "$work/cpcd/slots"
+	"$wbxrun" "$core" "$work/cpcd" --frames 1 --list-panel > "$work/cpcd.panel" 2> /dev/null || true
+	keys() { python3 "$root/tests/type-keys.py" "$work/cpcd.panel" "$1" "$2"; }
+	# disk_run <name> <frames> <key options...>: the RAM after the run, as one file
+	disk_run() {
+		dr_name="$1"; dr_frames="$2"; shift 2
+		rm -rf "$work/$dr_name.dom"; mkdir -p "$work/$dr_name.dom"
+		"$wbxrun" "$core" "$work/cpcd" --frames "$dr_frames" --report "$dr_frames" "$@" --dump-domains "$work/$dr_name.dom" > "$work/$dr_name.out" 2>&1 || true
+		cat "$work/$dr_name.dom"/*RAM* > "$work/$dr_name.ram" 2> /dev/null || true
+	}
+	check "cpc: a machine with a drive has the disk controls, one without has none" "" \
+		sh -c "grep -q \"'Next Disk' active\" '$work/cpcd.panel' && ! grep -q 'Next Disk' '$work/gx.panel'"
+	# shellcheck disable=SC2046
+	disk_run cpcd-one 500 $(keys 150 'cat\n')
+	# shellcheck disable=SC2046
+	disk_run cpcd-two 700 $(keys 150 'cat\n') $(keys 300 '{Next Disk}') $(keys 350 'cat\n')
+	check "cpc: Next Disk puts the second disk in" "CAT reads ONE, then TWO after Next Disk" \
+		sh -c "grep -q -a 'ONE     TXT' '$work/cpcd-one.ram' && ! grep -q -a 'TWO     TXT' '$work/cpcd-one.ram' && grep -q -a 'TWO     TXT' '$work/cpcd-two.ram'"
+	# what a program saves to disk one is still on it after the disk went out
+	# and came back, CAT reading the directory afresh from the disk in between
+	# shellcheck disable=SC2046
+	disk_run cpcd-save 1100 $(keys 150 'save"x"\n') $(keys 600 '{Next Disk}') $(keys 640 'cat\n') $(keys 800 '{Previous Disk}') $(keys 840 'cat\n')
+	# shellcheck disable=SC2046
+	disk_run cpcd-nosave 1100 $(keys 600 '{Next Disk}') $(keys 640 'cat\n') $(keys 800 '{Previous Disk}') $(keys 840 'cat\n')
+	check "cpc: what is saved to a disk stays on it when it comes out and goes back" "X.BAS after Next Disk and Previous Disk" \
+		sh -c "grep -q -a 'X       BAS' '$work/cpcd-save.ram' && ! grep -q -a 'X       BAS' '$work/cpcd-nosave.ram' && grep -q -a 'ONE     TXT' '$work/cpcd-save.ram'"
+	# shellcheck disable=SC2046
+	disk_run cpcd-eject 600 $(keys 150 '{Eject Disk}') $(keys 200 'cat\n')
+	check "cpc: Eject Disk leaves the drive empty" "CAT then reads no directory" \
+		sh -c "! grep -q -a 'ONE     TXT' '$work/cpcd-eject.ram' && [ -s '$work/cpcd-eject.ram' ]"
+	# the swaps run the same in the reference and in the sandbox, and through
+	# savestates
+	# shellcheck disable=SC2046
+	set -- $(keys 150 'save"x"\n') $(keys 600 '{Next Disk}') $(keys 640 'cat\n') $(keys 800 '{Previous Disk}') $(keys 840 'cat\n')
+	"$native" "$work/cpcd" --frames 1100 --report 50 "$@" > "$work/cpcd-swap.n" 2> /dev/null || true
+	"$wbxrun" "$core" "$work/cpcd" --frames 1100 --report 50 "$@" > "$work/cpcd-swap.w" 2> /dev/null || true
+	"$wbxrun" "$core" "$work/cpcd" --frames 1100 --report 50 "$@" --rerecord > "$work/cpcd-swap.rr" 2> /dev/null || true
+	stream "$work/cpcd-swap.n" > "$work/cpcd-swap.ns"; stream "$work/cpcd-swap.w" > "$work/cpcd-swap.ws"; stream "$work/cpcd-swap.rr" > "$work/cpcd-swap.rrs"
+	check "cpc: swaps run the same in the sandbox and with a state saved and loaded every frame" "" \
+		sh -c "cmp -s '$work/cpcd-swap.ns' '$work/cpcd-swap.ws' && cmp -s '$work/cpcd-swap.ws' '$work/cpcd-swap.rrs' && [ -s '$work/cpcd-swap.ws' ]"
+	# nothing is written to the files the machine was given
+	check "cpc: the disk files given are never written" "" \
+		sh -c "python3 '$root/tests/make-dsk.py' '$work/one.check' ONE > /dev/null && cmp -s '$work/one.check' '$work/cpcd/one.dsk'"
+fi
 # a firmware file missing: the machine is not built, and the file is named
 if [ -f "$roms/intv/settings" ]; then
 	copy_folder "$roms/intv" intv-nogrom

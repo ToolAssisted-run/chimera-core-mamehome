@@ -137,6 +137,7 @@ struct control
 	int player = 0;         // 1 and up, or 0 for none
 	int group = 0;          // 0 a kind of MAME's, 1 a field of no kind
 	int order = 0;          // MAME's place for the kind, or the driver's order
+	int disk = 0;           // not a field: 1 Previous Disk, 2 Next Disk, 3 Eject Disk
 };
 std::vector<control> s_buttons, s_axes;
 std::vector<int32_t> s_button_state, s_axis_state;
@@ -391,12 +392,71 @@ void controls_of(ioport_list const &ports, std::vector<control> &buttons, std::v
 	}
 }
 
+// ---- disks -------------------------------------------------------------------
+// A machine with a disk drive gets three controls of the core's own after its
+// fields: Previous Disk, Next Disk and Eject Disk. Every disk of the project
+// is in one list for the first drive, which starts with the first disk; Next
+// and Previous put the next or the previous disk of the list in (round the
+// end), Eject leaves the drive empty. What a game wrote to a disk stays with
+// that disk when it comes out (patch 0011 keeps written files in memory).
+std::vector<std::string> s_disks;   // the project's disks, in order
+int s_disk_at = 0;                  // the one last put in
+bool s_disk_out;                    // the drive was emptied
+int s_disk_action;                  // a control pressed this frame, done at its start
+std::vector<int32_t> s_disk_held;   // last frame's state of the three
+
+// the machine's first disk drive, or none
+device_image_interface *first_drive(device_t &root)
+{
+	for (device_image_interface &image : image_interface_enumerator(root))
+		if (!std::strcmp(image.image_type_name(), "floppydisk")) return &image;
+	return nullptr;
+}
+
+void add_disk_controls(device_t &root, std::vector<control> &buttons)
+{
+	if (!first_drive(root)) return;
+	static const char *const names[] = { "Previous Disk", "Next Disk", "Eject Disk" };
+	for (int i = 0; i < 3; i++)
+	{
+		control c;
+		c.name = names[i];
+		c.disk = i + 1;
+		buttons.push_back(std::move(c));
+	}
+}
+
+// the disk control pressed this frame, done at the start of MAME's next turn
+void do_disk_action()
+{
+	int const action = s_disk_action;
+	s_disk_action = 0;
+	if (!action || !s_machine || s_disks.empty()) return;
+	device_image_interface *const drive = first_drive(s_machine->root_device());
+	if (!drive) return;
+	int const n = int(s_disks.size());
+	if (action == 3)
+	{
+		drive->unload();
+		s_disk_out = true;
+		return;
+	}
+	s_disk_at = (s_disk_at + (action == 2 ? 1 : n - 1)) % n;
+	drive->unload();
+	auto const result = drive->load(s_disks[s_disk_at]);
+	s_disk_out = bool(result.first);
+	if (result.first)
+		std::fprintf(stderr, "the disk %s could not be put in: %s\n", s_disks[s_disk_at].c_str(), result.second.c_str());
+}
+
 // Finds the machine's controls and takes them off MAME's own key bindings:
 // what a field reads is what mame_set_button and mame_set_axis wrote, and
 // nothing else.
 void build_panel(running_machine &machine)
 {
 	controls_of(machine.ioport().ports(), s_buttons, s_axes);
+	add_disk_controls(machine.root_device(), s_buttons);
+	s_disk_held.assign(3, 0);
 	for (std::vector<control> *list : { &s_buttons, &s_axes })
 		for (control &c : *list)
 			for (ioport_field *field : c.fields)
@@ -424,8 +484,17 @@ s32 from_wire(control const &c, s32 v)
 void apply_panel()
 {
 	for (size_t i = 0; i < s_buttons.size(); i++)
+	{
+		if (int const d = s_buttons[i].disk)
+		{
+			// a disk control acts when it goes down
+			if (s_button_state[i] && !s_disk_held[d - 1]) s_disk_action = d;
+			s_disk_held[d - 1] = s_button_state[i];
+			continue;
+		}
 		for (ioport_field *field : s_buttons[i].fields)
 			field->set_value(s_button_state[i] ? 1 : 0);
+	}
 	for (size_t i = 0; i < s_axes.size(); i++)
 	{
 		control &c = s_axes[i];
@@ -573,6 +642,8 @@ public:
 		if (!skip_redraw) draw();
 		// the end of a frame: back to mame_frame's caller
 		co_switch(s_host);
+		// the start of the next: a disk control pressed for it
+		do_disk_action();
 	}
 
 	void input_update(bool relative_reset) override { }
@@ -1163,6 +1234,7 @@ extern "C" void mame_walk(void)
 				ports.append(device, errors);
 			std::vector<control> buttons, axes;
 			controls_of(ports, buttons, axes);
+			add_disk_controls(config.root_device(), buttons);
 			for (control const &c : buttons) std::printf("button %s\n", c.name.c_str());
 			for (control const &c : axes)
 				std::printf("axis %s\t%d\t%d\t%d\n", c.name.c_str(), c.relative ? -s32(c.bits) : c.min - c.rest,
@@ -1204,6 +1276,18 @@ extern "C" int mame_init(void)
 				std::transform(ext.begin(), ext.end(), ext.begin(), [] (unsigned char ch) { return char(std::tolower(ch)); });
 				std::string takes;
 				bool placed = false;
+				// a disk for the first drive: into the list the disk controls
+				// go through, the first of them into the drive
+				if (device_image_interface *drive = first_drive(config.root_device()); drive && takes_extension(*drive, ext))
+				{
+					if (s_disks.empty())
+					{
+						set(o, drive->instance_name().c_str(), file);
+						used.insert(drive->instance_name());
+					}
+					s_disks.push_back(file);
+					continue;
+				}
 				// a calculator's variable file goes over the link cable, to the
 				// core's sender (patch 0008), when the machine has a link port
 				if (is_ti_variable(ext) && config.root_device().subdevice("linkport"))
@@ -1303,6 +1387,7 @@ extern "C" const char *mame_button_label(int i) { return i >= 0 && i < int(s_but
 // its Controller Disc Emulation switch says)
 static bool live(control const &c)
 {
+	if (c.disk) return true;
 	for (ioport_field const *field : c.fields)
 		if (field->enabled()) return true;
 	return false;

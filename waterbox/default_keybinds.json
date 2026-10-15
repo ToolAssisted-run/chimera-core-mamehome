@@ -959,7 +959,10 @@
    "A": "A",
    "Caps Lock": "CapsLock",
    "Z": "Z",
-   "Del": "Backspace"
+   "Del": "Backspace",
+   "Previous Disk": "PageUp",
+   "Next Disk": "PageDown",
+   "Eject Disk": "Insert"
   },
   "Amstrad CPC6128 Controls": {
    "P1 Cheetah 125 Up": "",
@@ -1050,7 +1053,10 @@
    "A": "A",
    "Caps Lock": "CapsLock",
    "Z": "Z",
-   "Del": "Backspace"
+   "Del": "Backspace",
+   "Previous Disk": "PageUp",
+   "Next Disk": "PageDown",
+   "Eject Disk": "Insert"
   },
   "Amstrad CPC6128 (France, AZERTY Keyboard) Controls": {
    "P1 Cheetah 125 Up": "",
@@ -1141,7 +1147,10 @@
    "Q": "Q",
    "Caps Lock": "CapsLock",
    "W": "W",
-   "Del": "Backspace"
+   "Del": "Backspace",
+   "Previous Disk": "PageUp",
+   "Next Disk": "PageDown",
+   "Eject Disk": "Insert"
   },
   "Amstrad CPC6128 (Sweden/Finland) Controls": {
    "P1 Cheetah 125 Up": "",
@@ -1232,7 +1241,10 @@
    "A": "A",
    "Caps Lock": "CapsLock",
    "Z": "Z",
-   "Del": "Backspace"
+   "Del": "Backspace",
+   "Previous Disk": "PageUp",
+   "Next Disk": "PageDown",
+   "Eject Disk": "Insert"
   },
   "Amstrad CPC6128 (Spain) Controls": {
    "P1 Cheetah 125 Up": "",
@@ -1323,7 +1335,10 @@
    "A": "A",
    "Caps Lock": "CapsLock",
    "Z": "Z",
-   "Del": "Backspace"
+   "Del": "Backspace",
+   "Previous Disk": "PageUp",
+   "Next Disk": "PageDown",
+   "Eject Disk": "Insert"
   },
   "Amstrad CPC464+ Controls": {
    "P1 Cheetah 125 Up": "",
@@ -1414,7 +1429,10 @@
    "A": "A",
    "Caps Lock": "CapsLock",
    "Z": "Z",
-   "Del": "Backspace"
+   "Del": "Backspace",
+   "Previous Disk": "PageUp",
+   "Next Disk": "PageDown",
+   "Eject Disk": "Insert"
   },
   "Amstrad CPC6128+ Controls": {
    "P1 Cheetah 125 Up": "",
@@ -1505,7 +1523,10 @@
    "A": "A",
    "Caps Lock": "CapsLock",
    "Z": "Z",
-   "Del": "Backspace"
+   "Del": "Backspace",
+   "Previous Disk": "PageUp",
+   "Next Disk": "PageDown",
+   "Eject Disk": "Insert"
   },
   "Amstrad GX4000 Controls": {
    "P1 Up": "Up, J1 POV1U, X1 DpadUp, X1 LStickUp",

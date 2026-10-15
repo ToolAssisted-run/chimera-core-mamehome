@@ -82,13 +82,31 @@ half second until the calculator takes it. Found on the way:
 The default BIOS is OS 1.08, not MAME's 1.10: the newest whose ROM BizHawk
 users have (the owner's folder has 1.02 to 1.08).
 
+## Disks (owner, 2026-10-15: "Proceed with cpc swapping")
+
+- Previous Disk, Next Disk and Eject Disk: controls of the core's own on
+  every machine with a disk drive, after its MAME controls. A control acts
+  when it goes down, at the start of the next frame, on MAME's own stack.
+  All of the project's disks are one list for drive A (drive B stays
+  empty), as the VICE core does for the 1541.
+- Patch 0011: every file MAME opens for writing is a copy in memory of the
+  file it names, and every later open of that name is the copy. Before it, a
+  disk was write-protected in the sandbox (its files are read-only) and
+  writable in the reference build, which wrote to the test's own files.
+- Patch 0012: MAME cannot write the CPC's DSK format, so a disk's changes
+  lived only in its in-memory image and were lost when it came out. A disk
+  taken out is now kept, by its file's name, with any write still in
+  progress put on it first, and putting it in again takes it back. It is
+  kept changed or not: when the motor stops MAME clears "changed" after
+  "writing back" a format it cannot write.
+- A file AMSDOS saves is renamed from X.$$$ to X.BAS a few seconds after
+  "Ready"; a disk taken out before that keeps X.$$$, as a real one would.
+
 ## Measured (2026-10-15)
 
 - MAME's libraries: about 5 minutes a flavor on 14 processors. `core.wbx` is
   67 MB.
-- The test script: 67 passed, 0 failed, 0 skipped, with the local folders
-  (on 2026-10-15, after the 7800, Odyssey 2, CPC and TI-83 folders were
-  added).
+- The test script: 73 passed, 0 failed, 0 skipped, with the local folders.
   - The package is what the walk gives (24 machines, 18 settings, 30
     firmware files), and Chimera's own package checks pass (18).
   - The GX4000, on a cartridge the test writes (`tests/make-cpr.py`): it
@@ -103,6 +121,14 @@ users have (the owner's folder has 1.02 to 1.08).
   - The Odyssey 2 (a cartridge the test writes): each joystick read on the
     data bus, up, right, down, left and fire in bits 0 to 4.
   - The default key bindings name only keys Chimera sends (205 names).
+  - The CPC6128 with two disks the test writes (tests/make-dsk.py): CAT
+    (typed with tests/type-keys.py) reads disk ONE, then TWO after Next
+    Disk; a program saved to ONE is still on it after Next Disk and
+    Previous Disk; after Eject Disk CAT reads no directory; the swaps run
+    the same in the reference, the sandbox and with a state saved and
+    loaded every frame; the disk files given are never written. A planted
+    fault (Next Disk putting the same disk back) failed two of these tests.
+    On Windows, a project's Next Disk and CAT give Linux's picture.
   - The TI-83 (OS 1.08): a program file the test writes
     (tests/make-83p.py) goes over the link cable; its tokens and its
     catalogue entry are in RAM afterwards, and not without the file; ON,
@@ -147,7 +173,7 @@ the CPC runs BASIC. The TI-83's OS 1.02 to 1.08 match MAME's.
 
 ## Not done
 
-- A CPC disk is not swapped while the machine runs (Previous/Next Disk).
+- A changed disk is not handed out by Export Save Data.
 - Chimera's window on Windows not tried (only its headless runner).
 - Not published: a repository, CI, the roster and the README rows are the
   owner's to decide.

@@ -79,6 +79,7 @@ PREFERRED = {
     "Up-Up-Left": "a", "Up-Left": "b", "Left-Up-Left": "c", "Left-Down-Left": "d", "Down-Left": "e",
     "Down-Down-Left": "f", "Down-Down-Right": "h", "Down-Right": "i", "Right-Down-Right": "j",
     "Right-Up-Right": "k", "Up-Right": "m", "Up-Up-Right": "n",
+    "Previous Disk": "{", "Next Disk": "}", "Eject Disk": "~",
 }
 POOL = [chr(c) for c in range(0x21, 0x7f) if chr(c) not in ".|"]
 
@@ -152,7 +153,8 @@ KEYPAD = {str(d): "Keypad%d" % d for d in range(10)}
 KEYPAD.update({"Clear": "KeypadDecimal", "Enter": "KeypadEnter"})
 CONSOLE = {"Reset": "F1", "Select": "F2", "Pause": "F3",
            "TIME (Button 1)": "Number1", "HOLD (Button 2)": "Number2", "MODE (Button 3)": "Number3",
-           "START (Button 4)": "Number4"}
+           "START (Button 4)": "Number4",
+           "Previous Disk": "PageUp", "Next Disk": "PageDown", "Eject Disk": "Insert"}
 # a computer's key, by its name, to the PC key in the same place
 KEYS = {"Space": "Space", "Return": "Enter", "Enter": "Enter", "Shift": "Shift, LeftShift", "Control": "Ctrl",
         "Esc": "Escape", "Tab": "Tab", "Caps Lock": "CapsLock", "Del": "Backspace", "Clr": "Delete",

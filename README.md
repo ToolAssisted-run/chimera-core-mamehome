@@ -33,8 +33,8 @@ and the movie records it.
 
 - **The game**: a cartridge, or for a CPC a disk (`.dsk`), a tape (`.cdt`,
   `.wav`) or a snapshot (`.sna`). Each file goes into the first of the
-  machine's slots or drives that takes its kind, so a second disk goes into
-  the second drive. The Vectrex and the Channel F also start with no
+  machine's slots or drives that takes its kind. A CPC's disks are one list
+  for its first drive (see Disks). The Vectrex and the Channel F also start with no
   cartridge (Mine Storm, and the Channel F's built-in games). For the TI-83,
   a program or group file (`.83p`, `.83g`): the core sends it over the link
   cable three seconds after power-on, as TI's link software does, and again
@@ -66,6 +66,16 @@ movement this frame.
 Lag frames are counted: a frame in which the machine read none of its
 controls.
 
+## Disks
+
+A machine with a disk drive (the CPC664, the CPC6128 and its models, the
+CPC+) has three controls of the core's own after its keyboard: Next Disk and
+Previous Disk put the next or the previous disk of the project's list into
+drive A (round the end of the list), and Eject Disk leaves the drive empty.
+It starts with the first disk in. What a program writes to a disk stays with
+that disk when it comes out and goes back, and is part of a savestate; the
+project's own files are never written.
+
 ## Settings
 
 Besides the machine: its BIOS where MAME has more than one, and each switch
@@ -83,7 +93,6 @@ the machine: a movie needs the same values.
 
 ## Not there yet
 
-- A CPC disk is not swapped while the machine runs.
 - Only the GX4000 is tested on CI; the others are tested where their
   firmware is.
 
