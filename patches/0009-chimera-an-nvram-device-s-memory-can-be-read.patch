@@ -1,0 +1,15 @@
+--- a/src/devices/machine/nvram.h
++++ b/src/devices/machine/nvram.h
+@@ -47,6 +47,12 @@
+ 
+ 	// controls
+ 	void set_base(void *base, size_t length) { m_base = base; m_length = length; }
++#if defined(CHIMERA_CORE)
++	// chimera: the memory the device keeps, for the frontend's memory domains
++	// (a TI-83's RAM is only this)
++	void *chimera_base() const { return m_base; }
++	size_t chimera_length() const { return m_length; }
++#endif
+ 
+ protected:
+ 	// device-level overrides

@@ -266,7 +266,7 @@ machine_tests() { # <label> <folder> <frames>
 machine_tests gx4000 "$work/gx" 600
 
 # ------------------------------------ 3. machines that need firmware
-for m in intv:3000 channelf:1500 vectrex:1500 a7800:1500 odyssey2:1500 cpc:3000; do
+for m in intv:3000 channelf:1500 vectrex:1500 a7800:1500 odyssey2:1500 cpc:3000 ti83:1500; do
 	name="${m%%:*}"; frames="${m#*:}"
 	if [ ! -f "$roms/$name/settings" ]; then
 		report SKIP "$name: its tests" "no folder $roms/$name"
@@ -276,6 +276,7 @@ for m in intv:3000 channelf:1500 vectrex:1500 a7800:1500 odyssey2:1500 cpc:3000;
 	# the 7800's game is a cartridge the test writes (its folder holds the BIOS)
 	[ "$name" = a7800 ] && python3 "$root/tests/make-a78.py" "$work/a7800/test.a78" > /dev/null
 	[ "$name" = odyssey2 ] && python3 "$root/tests/make-o2.py" "$work/odyssey2/test.bin" > /dev/null
+	[ "$name" = ti83 ] && python3 "$root/tests/make-83p.py" "$work/ti83/test.83p" > /dev/null
 	"$wbxrun" "$core" "$work/$name" --frames 1 --list-panel > "$work/$name.panel" 2> /dev/null || true
 	reported "$work/$name.panel" > "$work/$name.core-names"
 	declared "$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['machine'])" "$roms/$name/settings")" > "$work/$name.declared-names"
@@ -299,6 +300,30 @@ if [ -f "$work/odyssey2/test.bin" ]; then
 	wiring odyssey2 "$work/odyssey2" 'O2T!' "$work/odyssey2.panel" 22 2 \
 		"0.0 0.2 0.3 0.1 0.4 1.0 1.2 1.3 1.1 1.4" \
 		"P1 Up" "P1 Down" "P1 Left" "P1 Right" "P1 Button 1" "P2 Up" "P2 Down" "P2 Left" "P2 Right" "P2 Button 1"
+fi
+# the TI-83: a program file goes over the link cable (patch 0008) a few
+# seconds after power-on; ON, then PRGM, ENTER, ENTER runs it, and it shows
+# 4242. Beside it the same keys with no file, which find no program.
+if [ -f "$work/ti83/test.83p" ]; then
+	copy_folder "$work/ti83" ti83-nofile
+	rm -f "$work/ti83-nofile/test.83p"; printf '{}' > "$work/ti83-nofile/slots"
+	ti_keys() { for k in "ON/OFF:30:10" "PRGM:400:5" "ENTER:450:5" "ENTER:500:5"; do
+		printf -- '--press %s:%s ' "$(index "$work/ti83.panel" "${k%%:*}")" "${k#*:}"; done; }
+	for d in ti83 ti83-nofile; do
+		rm -rf "$work/$d.dom"; mkdir -p "$work/$d.dom"
+		# shellcheck disable=SC2046
+		"$wbxrun" "$core" "$work/$d" --frames 600 --report 600 $(ti_keys) --dump-domains "$work/$d.dom" --vid-out "$work/$d.vid" > "$work/$d.keys" 2>&1 || true
+	done
+	has_program() { python3 -c "
+import glob, sys
+d = open(glob.glob(sys.argv[1] + '/*-nvram')[0], 'rb').read()
+sys.exit(0 if d.find(bytes.fromhex('de34323432')) >= 0 and d.find(b'AREMIHC') >= 0 else 1)" "$1" 2> /dev/null; }
+	if has_program "$work/ti83.dom" && ! has_program "$work/ti83-nofile.dom"; then
+		report PASS "ti83: the program is in RAM after the transfer, and not without the file" "its tokens and its catalogue entry"
+	else
+		report FAIL "ti83: the program is in RAM after the transfer, and not without the file"
+	fi
+	check "ti83: run by its keys, it changes the screen" "PRGM, ENTER, ENTER" differ "$work/ti83.vid" "$work/ti83-nofile.vid"
 fi
 # a firmware file missing: the machine is not built, and the file is named
 if [ -f "$roms/intv/settings" ]; then

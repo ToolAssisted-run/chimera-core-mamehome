@@ -1,10 +1,10 @@
 # chimera-core-mamehome
 
-Six home systems of [MAME](https://github.com/mamedev/mame) as one
+Seven home systems of [MAME](https://github.com/mamedev/mame) as one
 [Chimera](https://github.com/ToolAssisted-run/chimera) core, running in
 miniBox's sandbox: the Atari 7800, the Intellivision, the Vectrex, the
-Odyssey 2 (and Videopac), the Channel F and the Amstrad CPC (with the CPC+
-and the GX4000).
+Odyssey 2 (and Videopac), the Channel F, the Amstrad CPC (with the CPC+ and
+the GX4000) and the TI-83.
 
 MAME is not forked: `extern/mame` is upstream at a pinned commit, built with
 MAME's own build system for seven driver files (`waterbox/drivers.txt`),
@@ -27,6 +27,7 @@ and the movie records it.
 | Odyssey 2 | `odyssey2`, `videopac`, `videopacf` (C52), `videopacp` (G7400), `jopac` |
 | Channel F | `channelf`, `channlf2` |
 | Amstrad CPC | `cpc464`, `cpc664`, `cpc6128` and its French, Swedish and Spanish models, `cpc464p`, `cpc6128p`, `gx4000` |
+| TI-83 | `ti83` (OS 1.08 by default; the BIOS setting chooses another) |
 
 ## What a project needs
 
@@ -34,7 +35,11 @@ and the movie records it.
   `.wav`) or a snapshot (`.sna`). Each file goes into the first of the
   machine's slots or drives that takes its kind, so a second disk goes into
   the second drive. The Vectrex and the Channel F also start with no
-  cartridge (Mine Storm, and the Channel F's built-in games).
+  cartridge (Mine Storm, and the Channel F's built-in games). For the TI-83,
+  a program or group file (`.83p`, `.83g`): the core sends it over the link
+  cable three seconds after power-on, as TI's link software does, and again
+  until the calculator takes it, so the movie only has to switch the
+  calculator on (ON) and run the program (PRGM, ENTER, ENTER).
 - **Firmware**: the machine's own ROMs, with the contents MAME expects. The
   Firmware page asks for the ones the chosen machine needs, and the core
   checks each before the machine is built. The GX4000, the CPC464+ and the
@@ -78,7 +83,6 @@ the machine: a movie needs the same values.
 
 ## Not there yet
 
-- The TI-83: MAME has it, but no way to send a program to it from a file.
 - A CPC disk is not swapped while the machine runs.
 - Only the GX4000 is tested on CI; the others are tested where their
   firmware is.

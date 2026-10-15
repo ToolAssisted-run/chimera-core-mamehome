@@ -51,17 +51,44 @@ their patches apply unchanged. It moves with them.
 
 ## Machines
 
-`waterbox/machines.txt`: 24 machines of the 67 the seven driver files
+`waterbox/machines.txt`: 25 machines of the 67 the seven driver files
 declare. Left out: prototypes and clones that add nothing (the Odyssey 3, the
-Channel F's other licensed models), the KC Compact and the Aleste, and the
-TI calculators (see "Not done").
+Channel F's other licensed models), the KC Compact and the Aleste, and the TI
+calculators other than the TI-83 (BizHawk has the TI-83 only).
+
+## The TI-83's link cable
+
+MAME emulates the TI-83 but cannot send it a program from a file; BizHawk
+does it through the link cable, and so does this core (owner, 2026-10-15:
+"Yes you should"). Patch 0008 adds a device on MAME's TI-8x link port
+(`chimerafile`, chosen when the project has a `.83p` or `.83g`): the
+computer's side of TI's silent link protocol (RTS, then ACK and DATA after
+the calculator's CTS, then EOT), three seconds after power-on and again every
+half second until the calculator takes it. Found on the way:
+
+- MAME's TI-83 port read showed only the far side's pull-down on each line,
+  not the calculator's own (the lines are wired-AND, and MAME's TI-85 read
+  mixes both). The calculator's link routine waits for "my line low, the
+  other released", never saw it, and took each bit by its 0.64-second
+  timeout: a byte every 5 seconds. Patch 0010 reads the calculator's own
+  pull-down too; a byte then takes half a millisecond.
+- The calculator's ACK and CTS carry a length (11) and no data: only the
+  commands that carry data take their length as data.
+- A reply started the instant the calculator's last bit completes makes it
+  time out waiting for both lines to go idle, and drop the transfer: each
+  reply waits 5 ms.
+- A TI-83 does not answer an EOT.
+
+The default BIOS is OS 1.08, not MAME's 1.10: the newest whose ROM BizHawk
+users have (the owner's folder has 1.02 to 1.08).
 
 ## Measured (2026-10-15)
 
 - MAME's libraries: about 5 minutes a flavor on 14 processors. `core.wbx` is
   67 MB.
-- The test script: 59 passed, 0 failed, 0 skipped, with the local folders
-  (on 2026-10-15, after the 7800, Odyssey 2 and CPC folders were added).
+- The test script: 67 passed, 0 failed, 0 skipped, with the local folders
+  (on 2026-10-15, after the 7800, Odyssey 2, CPC and TI-83 folders were
+  added).
   - The package is what the walk gives (24 machines, 18 settings, 30
     firmware files), and Chimera's own package checks pass (18).
   - The GX4000, on a cartridge the test writes (`tests/make-cpr.py`): it
@@ -76,9 +103,15 @@ TI calculators (see "Not done").
   - The Odyssey 2 (a cartridge the test writes): each joystick read on the
     data bus, up, right, down, left and fire in bits 0 to 4.
   - The default key bindings name only keys Chimera sends (205 names).
+  - The TI-83 (OS 1.08): a program file the test writes
+    (tests/make-83p.py) goes over the link cable; its tokens and its
+    catalogue entry are in RAM afterwards, and not without the file; ON,
+    PRGM, ENTER, ENTER runs it (the screen shows 4242), and the same keys
+    with no file change the screen differently.
   - For the GX4000, the Intellivision (Astrosmash), the Channel F (its
     built-in games), the Vectrex (Mine Storm), the 7800, the Odyssey 2 and
-    the CPC6128 (BASIC, its keys pressed at random): the sandbox gives the
+    the CPC6128 (BASIC, its keys pressed at random) and the TI-83: the
+    sandbox gives the
     reference's digests every 50 frames under a wander over every control;
     a run without the wander differs; a state saved and loaded every frame,
     and a state moved to a new sandbox, change nothing.
@@ -110,13 +143,10 @@ video chip's character ROM (`charset_i8244.bin`, which BizHawk keeps in its
 code), and the CPC464, CPC664 and CPC6128 ROMs with the disk ROM. The
 owner's folder has no game for the 7800, the Odyssey 2 or the CPC, so the
 tests write their own cartridges (tests/make-a78.py, tests/make-o2.py) and
-the CPC runs BASIC.
+the CPC runs BASIC. The TI-83's OS 1.02 to 1.08 match MAME's.
 
 ## Not done
 
-- **TI-83**: MAME emulates the calculator but has no way to send a program
-  to it from a file (BizHawk does it through its link cable). It needs a
-  link device of our own that sends a `.83p` file.
 - A CPC disk is not swapped while the machine runs (Previous/Next Disk).
 - Chimera's window on Windows not tried (only its headless runner).
 - Not published: a repository, CI, the roster and the README rows are the

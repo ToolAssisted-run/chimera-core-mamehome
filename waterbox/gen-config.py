@@ -242,10 +242,10 @@ def firmware_entries(chosen, walk):
 # one system takes them
 EXTENSIONS = {
     "a7800": [".a78"], "intv": [".int", ".itv"], "vectrex": [".vec", ".gam"], "channelf": [".chf"],
-    "cpc6128": [".dsk", ".cdt", ".sna"], "gx4000": [".cpr"],
+    "cpc6128": [".dsk", ".cdt", ".sna"], "gx4000": [".cpr"], "ti83": [".83p", ".83g"],
 }
 # the shape a system's screen was shown in, where it is not 4:3
-SHAPE = {"VEC": (480, 640)}
+SHAPE = {"VEC": (480, 640), "TI83": (480, 320)}
 
 
 def main():

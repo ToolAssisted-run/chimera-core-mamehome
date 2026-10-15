@@ -7,9 +7,9 @@
       "min": 1,
       "max": 4,
       "formats": [
-        "a78", "bin", "int", "itv", "rom", "vec", "gam", "chf", "cpr", "dsk", "ipf", "cdt", "wav", "sna"
+        "a78", "bin", "int", "itv", "rom", "vec", "gam", "chf", "cpr", "dsk", "ipf", "cdt", "wav", "sna", "83p", "83g"
       ],
-      "help": "The game: a cartridge (.a78 for the Atari 7800; .int, .itv, .bin or .rom for the Intellivision; .vec, .gam or .bin for the Vectrex; .bin or .rom for the Odyssey 2; .chf or .bin for the Channel F; .cpr for the GX4000 and the CPC+), or for an Amstrad CPC a disk (.dsk), a tape (.cdt, .wav) or a snapshot (.sna). Each file goes into the first of the machine's drives or slots that takes its kind: a second disk goes into the second drive. The Machine setting says which machine it is."
+      "help": "The game: a cartridge (.a78 for the Atari 7800; .int, .itv, .bin or .rom for the Intellivision; .vec, .gam or .bin for the Vectrex; .bin or .rom for the Odyssey 2; .chf or .bin for the Channel F; .cpr for the GX4000 and the CPC+), or for an Amstrad CPC a disk (.dsk), a tape (.cdt, .wav) or a snapshot (.sna), or for the TI-83 a program or a group of variables (.83p, .83g), which the core sends over the link cable a few seconds after power-on. Each file goes into the first of the machine's drives or slots that takes its kind: a second disk goes into the second drive. The Machine setting says which machine it is."
     },
     {
       "id": "savedata",

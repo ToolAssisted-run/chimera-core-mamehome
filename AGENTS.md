@@ -1,7 +1,7 @@
 # AGENTS.md - MAME home systems core for Chimera
 
-This repository builds six home systems of MAME (Atari 7800, Intellivision,
-Vectrex, Odyssey 2, Channel F, Amstrad CPC) as one sandboxed guest for
+This repository builds seven home systems of MAME (Atari 7800, Intellivision,
+Vectrex, Odyssey 2, Channel F, Amstrad CPC, TI-83) as one sandboxed guest for
 Chimera (https://github.com/ToolAssisted-run/chimera), a frontend for
 tool-assisted speedruns. MAME is not forked: its own build system builds its
 libraries for seven driver files, and `waterbox/` replaces its frontend and
@@ -35,8 +35,9 @@ was measured and what is not done. The arcade core
 - `waterbox/gen-config.py` - GENERATES `waterbox.config` and
   `default_keybinds.json` (both committed) from the walk, with
   `waterbox.template.json` for what every machine shares.
-- `waterbox/run-gate.sh` - the test script. `tests/make-cpr.py` - the GX4000
-  test cartridge.
+- `waterbox/run-gate.sh` - the test script. `tests/make-cpr.py`,
+  `make-a78.py`, `make-o2.py`, `make-83p.py` - the test cartridges and the
+  TI-83 test program. `tests/run-frontend.sh` - the window test.
 - `waterbox/libco/` - ares's libco. `guest-shim/`, `native-shim/` - headers.
 - `waterbox/bin/`, `build/` - build output (ignored by git).
 - `tests/roms-local/` - a folder per machine with its firmware and a game,
@@ -116,5 +117,12 @@ in the commit what ran, with the numbers. Chimera's own package checks need
   control to the end.
 - MAME catches what is thrown while it starts a machine and carries on. A
   reason not to start is put in `s_refused`, and `mame_init` answers with it.
+- The TI-83's link sender (patch 0008) needs patch 0010: MAME's TI-83 port
+  read did not show the calculator's own pull-down, and every bit waited for
+  the calculator's 0.64-second timeout. A reply waits 5 ms after the
+  calculator's last bit, or it drops the transfer.
+- A patch that adds files is regenerated with `diff -uN` per file; a shell
+  script with `set -e` stops at the first `diff`, which exits 1 when files
+  differ, and leaves a patch with only its first file.
 - MAME reads every port once a frame for itself. Patch 0005 leaves those
   reads out, or no frame would ever count as a lag frame.

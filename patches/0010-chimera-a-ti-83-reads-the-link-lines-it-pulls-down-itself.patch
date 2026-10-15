@@ -1,0 +1,21 @@
+--- a/src/mame/ti/ti85_m.cpp
++++ b/src/mame/ti/ti85_m.cpp
+@@ -707,8 +707,18 @@
+ 
+ uint8_t ti85_state::ti83_port_0000_r()
+ {   
++#if defined(CHIMERA_CORE)
++	// chimera: a line the calculator itself pulls down reads low, as the TI-85's
++	// port does here (the lines are wired-AND). Without it the TI-83's link
++	// routine, waiting for "my line low, the other released", never sees it and
++	// takes every bit by its 0.64-second timeout. m_PCR holds the written bits
++	// inverted: 0 is a line pulled down.
++	uint8_t const tip_in(((!m_link_port || m_link_port->tip_r()) && (m_PCR & 0x01)) ? 0x0C : 0x08);
++	uint8_t const ring_in(((!m_link_port || m_link_port->ring_r()) && (m_PCR & 0x02)) ? 0x0C : 0x04);
++#else
+ 	uint8_t const tip_in((!m_link_port || m_link_port->tip_r()) ? 0x0C : 0x08);
+ 	uint8_t const ring_in((!m_link_port || m_link_port->ring_r()) ? 0x0C : 0x04);
++#endif
+ 	return ((m_ti8x_memory_page_1 & 0x08) << 1) | (tip_in & ring_in) | m_PCR;
+ }
+ 

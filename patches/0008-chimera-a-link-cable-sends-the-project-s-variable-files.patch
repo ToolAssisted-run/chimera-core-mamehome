@@ -1,0 +1,324 @@
+--- a/scripts/src/bus.lua
++++ b/scripts/src/bus.lua
+@@ -5883,6 +5883,8 @@
+ 	files {
+ 		MAME_DIR .. "src/devices/bus/ti8x/bitsocket.cpp",
+ 		MAME_DIR .. "src/devices/bus/ti8x/bitsocket.h",
++		MAME_DIR .. "src/devices/bus/ti8x/chimerafile.cpp",
++		MAME_DIR .. "src/devices/bus/ti8x/chimerafile.h",
+ 		MAME_DIR .. "src/devices/bus/ti8x/graphlinkhle.cpp",
+ 		MAME_DIR .. "src/devices/bus/ti8x/graphlinkhle.h",
+ 		MAME_DIR .. "src/devices/bus/ti8x/teeconn.cpp",
+--- /dev/null
++++ b/src/devices/bus/ti8x/chimerafile.cpp
+@@ -0,0 +1,259 @@
++// license:BSD-3-Clause
++// copyright-holders:Sergio Martin
++/*
++ chimera: sends variable files to the calculator over the link cable.
++
++ A file (TI's .83p/.8xp format) holds one or more variables. For each, the
++ computer's side of TI's link protocol, in its silent form:
++
++   computer: RTS (the variable's size, type and name)
++   calculator: ACK, then CTS when it has room (or SKIP when it refuses)
++   computer: ACK, DATA (the variable's bytes)
++   calculator: ACK
++   computer: EOT (which a TI-83 does not answer)
++
++ A packet is the machine id, the command, a 16-bit length, and for the
++ commands that carry data, the data and its 16-bit sum. The calculator answers only while
++ its operating system is waiting for a key, so the first variable is sent
++ a few seconds after power-on, and a variable the calculator did not take
++ is sent again a little later. Everything is timed in emulated time, so a
++ run does the same every time.
++ */
++
++#include "emu.h"
++#include "chimerafile.h"
++
++#include <algorithm>
++#include <cstring>
++
++#if defined(CHIMERA_CORE)
++
++namespace {
++
++constexpr u8 CMD_RTS = 0xc9, CMD_ACK = 0x56, CMD_CTS = 0x09, CMD_DATA = 0x15, CMD_EOT = 0x92, CMD_SKIP = 0x36;
++
++class chimera_file_device : public device_t, public device_ti8x_link_port_byte_interface
++{
++public:
++	chimera_file_device(machine_config const &mconfig, char const *tag, device_t *owner, uint32_t clock)
++		: device_t(mconfig, TI8X_CHIMERA_FILE, tag, owner, clock)
++		, device_ti8x_link_port_byte_interface(mconfig, *this)
++	{
++	}
++
++protected:
++	virtual void device_start() override ATTR_COLD
++	{
++		m_timer = timer_alloc(FUNC(chimera_file_device::start_variable), this);
++		m_reply_timer = timer_alloc(FUNC(chimera_file_device::send_reply), this);
++	}
++
++	virtual void device_reset() override ATTR_COLD
++	{
++		read_files();
++		m_var = 0;
++		m_tries = 0;
++		m_state = IDLE;
++		m_rx.clear();
++		m_tx.clear();
++		m_reply_timer->reset();
++		if (!m_vars.empty())
++			m_timer->adjust(attotime::from_seconds(3));
++	}
++
++	virtual void byte_collision() override { retry("the calculator was sending as well"); }
++	virtual void byte_send_timeout() override { retry("the calculator did not take a byte"); }
++	virtual void byte_receive_timeout() override { retry("the calculator stopped half way through a byte"); }
++
++	virtual void byte_sent() override
++	{
++		if (++m_tx_at < m_tx.size())
++		{
++			send_byte(m_tx[m_tx_at]);
++			return;
++		}
++		// the packet (or packets) are out: wait for the answer
++		m_rx.clear();
++		switch (m_state)
++		{
++		case SEND_RTS: m_state = WAIT_CTS; break;
++		case SEND_DATA: m_state = WAIT_DATA_ACK; break;
++		case SEND_EOT:
++			// the end of the variable: a TI-83 does not answer an EOT
++			logerror("sent %s\n", m_vars[m_var].label);
++			next_variable();
++			break;
++		case SEND_SKIP_ACK: next_variable(); break;
++		default: break;
++		}
++	}
++
++	virtual void byte_received(u8 data) override
++	{
++		accept_byte();
++		m_rx.push_back(data);
++		if (m_rx.size() < 4) return;
++		// only some commands carry data; the others' length field means
++		// nothing (a TI-83's ACK has 11 there)
++		u8 const cmd = m_rx[1];
++		bool const has_data = cmd == 0x06 || cmd == CMD_DATA || cmd == CMD_SKIP || cmd == 0x88 || cmd == 0xa2 || cmd == CMD_RTS;
++		unsigned const length = has_data ? (m_rx[2] | (m_rx[3] << 8)) : 0;
++		if (m_rx.size() < 4 + (length ? length + 2 : 0)) return;
++		m_rx.clear();
++		switch (m_state)
++		{
++		case WAIT_CTS:
++			if (cmd == CMD_CTS)
++			{
++				// acknowledged, then the variable's bytes
++				m_tx = packet(CMD_ACK, nullptr, 0);
++				auto const data = packet(CMD_DATA, m_vars[m_var].data.data(), m_vars[m_var].data.size());
++				m_tx.insert(m_tx.end(), data.begin(), data.end());
++				reply(SEND_DATA);
++			}
++			else if (cmd == CMD_SKIP)
++			{
++				logerror("the calculator refused %s\n", m_vars[m_var].label);
++				m_tx = packet(CMD_ACK, nullptr, 0);
++				reply(SEND_SKIP_ACK);
++			}
++			break;   // the ACK before the CTS needs nothing
++		case WAIT_DATA_ACK:
++			if (cmd == CMD_ACK)
++			{
++				m_tx = packet(CMD_EOT, nullptr, 0);
++				reply(SEND_EOT);
++			}
++			break;
++		default:
++			break;
++		}
++	}
++
++private:
++	enum state { IDLE, SEND_RTS, WAIT_CTS, SEND_DATA, WAIT_DATA_ACK, SEND_EOT, SEND_SKIP_ACK, DONE };
++	struct variable { std::vector<u8> header; std::vector<u8> data; std::string label; };
++
++	// the computer's machine id for this calculator, and whether its
++	// variable header has the TI-83 Plus's version and flag bytes
++	u8 machine_id() const { return plus() ? 0x23 : 0x03; }
++	bool plus() const
++	{
++		std::string const name = machine().system().name;
++		return name.compare(0, 5, "ti83p") == 0 || name.compare(0, 4, "ti84") == 0;
++	}
++
++	void read_files()
++	{
++		m_vars.clear();
++		for (auto const &file : chimera_ti8x_files())
++		{
++			std::vector<u8> const &f = file.second;
++			// "**TI83**" or "**TI83F*", 3 bytes, a 42-byte comment, the length of the entries
++			if (f.size() < 57 || std::memcmp(f.data(), "**TI8", 5) != 0)
++			{
++				logerror("%s is not a TI variable file\n", file.first);
++				continue;
++			}
++			size_t at = 55, end = std::min<size_t>(f.size(), 55 + (f[53] | (f[54] << 8)));
++			while (at + 2 <= end)
++			{
++				unsigned const hlen = f[at] | (f[at + 1] << 8);
++				if (hlen < 11 || at + 2 + hlen + 2 > end) break;
++				variable v;
++				// the header the calculator is sent: size, type and name, and
++				// for a TI-83 Plus its version and flag bytes
++				v.header.assign(f.begin() + at + 2, f.begin() + at + 2 + 11);
++				if (plus())
++				{
++					v.header.push_back(hlen >= 13 ? f[at + 2 + 11] : 0);
++					v.header.push_back(hlen >= 13 ? f[at + 2 + 12] : 0);
++				}
++				unsigned const dlen = f[at + 2 + hlen] | (f[at + 2 + hlen + 1] << 8);
++				size_t const data = at + 2 + hlen + 2;
++				if (data + dlen > end) break;
++				v.data.assign(f.begin() + data, f.begin() + data + dlen);
++				for (int i = 0; i < 8 && v.header[3 + i]; i++)
++					v.label += char(v.header[3 + i]);
++				v.label = file.first + ":" + v.label;
++				m_vars.push_back(std::move(v));
++				at = data + dlen;
++			}
++		}
++	}
++
++	std::vector<u8> packet(u8 cmd, u8 const *data, size_t length) const
++	{
++		std::vector<u8> out { machine_id(), cmd, u8(length), u8(length >> 8) };
++		if (length)
++		{
++			u16 sum = 0;
++			for (size_t i = 0; i < length; i++) { out.push_back(data[i]); sum += data[i]; }
++			out.push_back(u8(sum));
++			out.push_back(u8(sum >> 8));
++		}
++		return out;
++	}
++
++	// a reply to the calculator, a moment after its packet: its link routine
++	// waits for both lines to go idle after its last byte, and a bit started
++	// at once makes it time out and drop the transfer
++	void reply(state next)
++	{
++		m_next = next;
++		m_reply_timer->adjust(attotime::from_msec(5));
++	}
++
++	TIMER_CALLBACK_MEMBER(send_reply) { send(m_next); }
++
++	void send(state next)
++	{
++		m_state = next;
++		m_tx_at = 0;
++		send_byte(m_tx[0]);
++	}
++
++	TIMER_CALLBACK_MEMBER(start_variable)
++	{
++		if (m_var >= m_vars.size()) { m_state = DONE; return; }
++		m_rx.clear();
++		m_tx = packet(CMD_RTS, m_vars[m_var].header.data(), m_vars[m_var].header.size());
++		send(SEND_RTS);
++	}
++
++	void next_variable()
++	{
++		m_var++;
++		m_tries = 0;
++		m_state = IDLE;
++		m_timer->adjust(attotime::from_msec(100));
++	}
++
++	// the exchange broke off (the calculator is off, busy, or not on its
++	// home screen): the variable again, a little later, for as long as it
++	// takes - a movie may switch the calculator on whenever it likes
++	void retry(char const *why)
++	{
++		if (m_state == IDLE || m_state == DONE) return;
++		if (m_tries++ == 0) logerror("%s: %s, trying again\n", m_vars[m_var].label, why);
++		m_state = IDLE;
++		m_rx.clear();
++		m_timer->adjust(attotime::from_msec(500));
++	}
++
++	emu_timer *m_timer = nullptr;
++	emu_timer *m_reply_timer = nullptr;
++	state m_next = IDLE;
++	std::vector<variable> m_vars;
++	size_t m_var = 0;
++	int m_tries = 0;
++	state m_state = IDLE;
++	std::vector<u8> m_tx, m_rx;
++	size_t m_tx_at = 0;
++};
++
++} // anonymous namespace
++
++DEFINE_DEVICE_TYPE_PRIVATE(TI8X_CHIMERA_FILE, device_ti8x_link_port_interface, chimera_file_device, "ti8x_chimerafile", "Chimera variable sender")
++
++#endif // CHIMERA_CORE
+--- /dev/null
++++ b/src/devices/bus/ti8x/chimerafile.h
+@@ -0,0 +1,27 @@
++// license:BSD-3-Clause
++// copyright-holders:Sergio Martin
++/*
++ chimera: a computer at the other end of the link cable that sends a
++ Chimera project's variable files (.83p, .83g, .8xp...) to a TI-83 or
++ TI-83 Plus, the way TI's link software does: silently (the calculator
++ need not be on its Receive screen), one variable after another, once the
++ calculator has had time to start. Only in the Chimera core's build.
++ */
++#ifndef MAME_BUS_TI8X_CHIMERAFILE_H
++#define MAME_BUS_TI8X_CHIMERAFILE_H
++
++#pragma once
++
++#include "ti8x.h"
++
++#include <string>
++#include <utility>
++#include <vector>
++
++
++DECLARE_DEVICE_TYPE(TI8X_CHIMERA_FILE, device_ti8x_link_port_interface)
++
++// the Chimera core's frontend: the files to send, by name, in order
++std::vector<std::pair<std::string, std::vector<u8>>> const &chimera_ti8x_files();
++
++#endif // MAME_BUS_TI8X_CHIMERAFILE_H
+--- a/src/devices/bus/ti8x/ti8x.cpp
++++ b/src/devices/bus/ti8x/ti8x.cpp
+@@ -607,6 +607,9 @@
+ #include "graphlinkhle.h"
+ #include "teeconn.h"
+ #include "tispeaker.h"
++#if defined(CHIMERA_CORE)
++#include "chimerafile.h"
++#endif
+ 
+ 
+ // must come after including the headers that declare these extern
+@@ -621,4 +624,8 @@
+ 	device.option_add("tee",           TI8X_TEE_CONNECTOR);
+ 	device.option_add("monospkr",      TI8X_SPEAKER_MONO);
+ 	device.option_add("stereospkr",    TI8X_SPEAKER_STEREO);
++#if defined(CHIMERA_CORE)
++	// chimera: the project's variable files, sent over the cable
++	device.option_add("chimerafile",   TI8X_CHIMERA_FILE);
++#endif
+ }

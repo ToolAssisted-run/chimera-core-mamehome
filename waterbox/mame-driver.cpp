@@ -38,6 +38,7 @@
 #include "path.h"
 #include "screen.h"
 #include "dinvram.h"
+#include "machine/nvram.h"
 #include "ioprocs.h"
 #include "ioprocsvec.h"
 #include "sound.h"
@@ -68,6 +69,29 @@ std::map<std::string, std::string> s_options;
 std::map<std::string, std::string> s_switches;
 // the game's files, in order: each goes into one of the machine's media devices
 std::vector<std::string> s_media;
+// a TI calculator's variable files: sent over its link cable (patch 0008)
+std::vector<std::pair<std::string, std::vector<uint8_t>>> s_link_files;
+
+// MAME's default BIOS, except for a machine the core starts with another:
+// the TI-83 with OS 1.08, the newest whose ROM BizHawk users have (MAME's is
+// 1.10)
+const char *bios_override(const char *machine)
+{
+	static std::pair<const char *, const char *> const table[] = { { "ti83", "v108" } };
+	for (auto const &t : table)
+		if (!std::strcmp(t.first, machine)) return t.second;
+	return nullptr;
+}
+
+// the extensions of a TI calculator's variable files
+bool is_ti_variable(std::string const &ext)
+{
+	static const char *const list[] = { "83p", "83g", "83n", "83l", "83m", "83y", "83s", "83i",
+		"8xp", "8xg", "8xn", "8xl", "8xm", "8xy", "8xs", "8xi", "8xv" };
+	for (const char *e : list)
+		if (ext == e) return true;
+	return false;
+}
 std::string s_error;
 std::string s_log;          // what MAME printed as errors and warnings
 running_machine *s_machine;
@@ -777,6 +801,9 @@ std::string status_text(game_driver const &driver, machine_config const &config)
 
 } // anonymous namespace
 
+// the variable files the TI link sender sends (patch 0008)
+std::vector<std::pair<std::string, std::vector<u8>>> const &chimera_ti8x_files() { return s_link_files; }
+
 // the hash files MAME reads for a cartridge with no header of its own
 // (patch 0007): carried in the core, because a sandbox has no folder for them
 #include "hash-files.inc"
@@ -856,6 +883,9 @@ std::vector<needed_file> audit(emu_options &options, game_driver const &driver, 
 {
 	chosen = config.root_device().default_bios();
 	auto const bioses = romload::entries(driver.rom).get_system_bioses();
+	if (const char *own = bios_override(driver.name))
+		for (romload::system_bios const &choice : bioses)
+			if (!std::strcmp(own, choice.get_name())) chosen = choice.get_value();
 	if (auto const asked = s_options.find("bios"); asked != s_options.end())
 		for (romload::system_bios const &choice : bioses)
 			if (asked->second == choice.get_name()) chosen = choice.get_value();
@@ -986,7 +1016,9 @@ void describe_machine(game_driver const &driver)
 		if (f.bios == 0 || f.bios == chosen) s_desc.files.push_back(f);
 	for (romload::system_bios const &bios : romload::entries(driver.rom).get_system_bioses())
 	{
-		if (bios.get_value() == config.root_device().default_bios()) s_desc.default_bios = bios.get_name();
+		if (bios_override(driver.name) ? !std::strcmp(bios_override(driver.name), bios.get_name())
+				: bios.get_value() == config.root_device().default_bios())
+			s_desc.default_bios = bios.get_name();
 		s_desc.bios.emplace_back(bios.get_name(), bios.get_description());
 	}
 	s_desc.switches = switches_of(config);
@@ -1153,6 +1185,8 @@ extern "C" int mame_init(void)
 		auto &o = *s_emu_options;
 		fixed_options(o);
 		o.set_system_name(s_game);
+		if (!s_options.count("bios"))
+			if (const char *bios = bios_override(s_game.c_str())) s_options["bios"] = bios;
 		for (auto const &kv : s_options)
 			set(o, kv.first.c_str(), kv.second);
 		if (!o.system())
@@ -1170,6 +1204,21 @@ extern "C" int mame_init(void)
 				std::transform(ext.begin(), ext.end(), ext.begin(), [] (unsigned char ch) { return char(std::tolower(ch)); });
 				std::string takes;
 				bool placed = false;
+				// a calculator's variable file goes over the link cable, to the
+				// core's sender (patch 0008), when the machine has a link port
+				if (is_ti_variable(ext) && config.root_device().subdevice("linkport"))
+				{
+					FILE *const f = std::fopen(file.c_str(), "rb");
+					if (!f) throw std::runtime_error("the file " + file + " could not be read");
+					std::vector<uint8_t> bytes;
+					uint8_t chunk[65536];
+					for (size_t got; (got = std::fread(chunk, 1, sizeof chunk, f)) > 0;)
+						bytes.insert(bytes.end(), chunk, chunk + got);
+					std::fclose(f);
+					s_link_files.emplace_back(file, std::move(bytes));
+					set(o, "linkport", "chimerafile");
+					continue;
+				}
 				for (device_image_interface &image : image_interface_enumerator(config.root_device()))
 				{
 					takes += (takes.empty() ? "" : ", ") + image.instance_name() + " (" + image.file_extensions() + ")";
@@ -1340,6 +1389,14 @@ void find_domains()
 			s_domains.push_back({ util::string_format("%s:%04x", memory.device().tag() + 1, entry.m_addrstart), ptr, bytes });
 		}
 	}
+	// memory an NVRAM device keeps (patch 0009): a machine's battery-backed
+	// RAM, which for a TI-83 is all of its RAM
+	for (nvram_device &nvram : device_type_enumerator<nvram_device>(s_machine->root_device()))
+		if (nvram.chimera_base() && nvram.chimera_length()
+			&& std::none_of(s_domains.begin(), s_domains.end(), [&nvram] (domain const &d) {
+				auto const *p = static_cast<uint8_t const *>(nvram.chimera_base());
+				return p >= d.ptr && p < d.ptr + d.size; }))
+			s_domains.push_back({ nvram.tag() + 1, static_cast<uint8_t *>(nvram.chimera_base()), int64_t(nvram.chimera_length()) });
 	// and memory a driver keeps in arrays of its own, reached through its own
 	// handlers (the Intellivision's RAM): every array of 64 bytes or more it
 	// registers for MAME's savestates, by MAME's name for it, unless it is

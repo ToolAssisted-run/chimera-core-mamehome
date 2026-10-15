@@ -26,3 +26,4 @@ cpc6128sp  AmstradCPC  Amstrad CPC
 cpc464p    AmstradCPC  Amstrad CPC
 cpc6128p   AmstradCPC  Amstrad CPC
 gx4000     AmstradCPC  Amstrad CPC
+ti83       TI83        TI-83
