@@ -144,6 +144,17 @@ if [ "$ok" = 1 ]; then
 else
 	report FAIL "the declarations hold together" "$(tail -1 "$work/decl.log")"
 fi
+# every key the default bindings name is one Chimera sends (a binding to a
+# name it never sends never fires)
+if [ -d "$chimera_root/source/gui" ]; then
+	if python3 "$root/tests/check-key-names.py" "$chimera_root" "$here/default_keybinds.json" > "$work/keynames.log" 2>&1; then
+		report PASS "the default key bindings name keys Chimera sends" "$(tail -1 "$work/keynames.log")"
+	else
+		report FAIL "the default key bindings name keys Chimera sends" "$(tail -1 "$work/keynames.log")"
+	fi
+else
+	report SKIP "the default key bindings name keys Chimera sends" "no Chimera source at $chimera_root"
+fi
 # the machine entry the package declares is the core's, in the sandbox: its
 # controls in the same order
 # declared <machine>: that machine's controls in the package, one a line
@@ -168,55 +179,65 @@ declared gx4000 > "$work/gx.declared-names"
 check "gx4000: the core's controls are the package's" "$(wc -l < "$work/gx.declared-names") controls" \
 	same "$work/gx.core-names" "$work/gx.declared-names"
 
-# ram <dir> <out>: the test program's memory (&8000-&803f) after the run
-# that wrote <dir>'s domains: found by the signature the program leaves at &8030
-ram() { python3 - "$1" > "$2" <<'PY'
+# ram <dir> <signature> <out>: the test program's memory (64 bytes) after
+# the run that wrote <dir>'s domains: found by the signature the program
+# leaves 0x30 bytes in
+ram() { python3 - "$1" "$2" > "$3" <<'PY'
 import os, sys
 for name in sorted(os.listdir(sys.argv[1])):
     data = open(os.path.join(sys.argv[1], name), "rb").read()
-    at = data.find(b"CPRT")
+    at = data.find(sys.argv[2].encode())
     if at >= 0x30:
         print(" ".join("%02x" % b for b in data[at - 0x30:at + 0x10]))
         break
 PY
 }
-# gx_run <name> <frames> [options]: a run of the test cartridge, its memory kept
-gx_run() {
-	gr_name="$1"; gr_frames="$2"; shift 2
-	rm -rf "$work/$gr_name.dom"; mkdir -p "$work/$gr_name.dom"
-	"$wbxrun" "$core" "$work/gx" --frames "$gr_frames" --report "$gr_frames" --dump-domains "$work/$gr_name.dom" "$@" > "$work/$gr_name.out" 2>&1 || true
-	ram "$work/$gr_name.dom" "$work/$gr_name.ram"
+# prog_run <folder> <signature> <name> <frames> [options]: a run of a test
+# cartridge in the sandbox, its memory kept
+prog_run() {
+	pr_dir="$1"; pr_sig="$2"; pr_name="$3"; pr_frames="$4"; shift 4
+	rm -rf "$work/$pr_name.dom"; mkdir -p "$work/$pr_name.dom"
+	"$wbxrun" "$core" "$pr_dir" --frames "$pr_frames" --report "$pr_frames" --dump-domains "$work/$pr_name.dom" "$@" > "$work/$pr_name.out" 2>&1 || true
+	ram "$work/$pr_name.dom" "$pr_sig" "$work/$pr_name.ram"
 }
 # byte <ram file> <offset>: one byte of the program's memory, as a number
 byte() { awk -v o="$2" '{print strtonum("0x" $(o+1))}' "$1"; }
+# wiring <label> <folder> <signature> <panel> <first byte> <bytes> <expected> <control>...:
+# each control, held from frame 100 to the end of a 120-frame run, changes
+# the bits of the program's copy of the machine's inputs that the expected
+# list says, in order: "row.bit" for a bit that goes to 0 and "row.bit+"
+# for one that goes to 1, several of one control joined by ","
+wiring() {
+	wr_label="$1"; wr_dir="$2"; wr_sig="$3"; wr_panel="$4"; wr_first="$5"; wr_n="$6"; wr_want="$7"; shift 7
+	prog_run "$wr_dir" "$wr_sig" "$wr_label-idle" 120
+	wr_got=""
+	for c in "$@"; do
+		i="$(index "$wr_panel" "$c")"
+		[ -n "$i" ] || { wr_got="$wr_got ?"; continue; }
+		prog_run "$wr_dir" "$wr_sig" "$wr_label-press" 120 --press "$i:100:40"
+		wr_got="$wr_got $(python3 -c "
+import sys
+a = open(sys.argv[1]).read().split(); b = open(sys.argv[2]).read().split()
+first, n = int(sys.argv[3]), int(sys.argv[4])
+out = []
+for row in range(n):
+    x, y = int(a[first + row], 16), int(b[first + row], 16)
+    for bit in range(8):
+        if (x >> bit) & 1 and not (y >> bit) & 1: out.append('%d.%d' % (row, bit))
+        if not (x >> bit) & 1 and (y >> bit) & 1: out.append('%d.%d+' % (row, bit))
+print(','.join(out) or '-')" "$work/$wr_label-idle.ram" "$work/$wr_label-press.ram" "$wr_first" "$wr_n")"
+	done
+	check "$wr_label: each control reaches the input it is wired to" "$wr_got" [ "$wr_got" = " $wr_want" ]
+}
 
-gx_run gx-idle 120
+prog_run "$work/gx" CPRT gx-idle 120
 frames="$(( $(byte "$work/gx-idle.ram" 0) + 256 * $(byte "$work/gx-idle.ram" 1) ))"
 check "gx4000: the test cartridge runs and counts its frames" "$frames frames counted of 120" \
 	sh -c "[ $frames -ge 100 ] && [ $frames -le 121 ]"
-# every joystick control clears one bit of its row: the one it is wired to
-jbits=""; jok=1
-for c in "P1 Up" "P1 Down" "P1 Left" "P1 Right" "P1 Button 1" "P1 Button 2" "P2 Up" "P2 Down" "P2 Left" "P2 Right" "P2 Button 1" "P2 Button 2"; do
-	i="$(index "$work/gx.panel" "$c")"
-	[ -n "$i" ] || { jok=0; continue; }
-	gx_run gx-press 120 --press "$i:100:40"
-	changed="$(python3 -c "
-import sys
-a = open(sys.argv[1]).read().split(); b = open(sys.argv[2]).read().split()
-out = []
-for row in range(10):
-    x, y = int(a[8 + row], 16), int(b[8 + row], 16)
-    for bit in range(8):
-        if (x >> bit) & 1 and not (y >> bit) & 1: out.append('%d.%d' % (row, bit))
-print(','.join(out))" "$work/gx-idle.ram" "$work/gx-press.ram")"
-	case "$changed" in *,*|"") jok=0 ;; esac
-	case " $jbits " in *" $changed "*) jok=0 ;; esac
-	jbits="$jbits $changed"
-done
-# the CPC's wiring: joystick 1 is row 9 and joystick 2 row 6 of the matrix,
-# bits 0 to 5 up, down, left, right, fire 1 and fire 2
-check "gx4000: each joystick control is its own bit of the keyboard matrix" "row.bit:$jbits" \
-	sh -c "[ '$jok' = 1 ] && [ '$jbits' = ' 9.0 9.1 9.2 9.3 9.4 9.5 6.0 6.1 6.2 6.3 6.4 6.5' ]"
+# the CPC's wiring: joystick 1 is row 9 and joystick 2 row 6 of the keyboard
+# matrix, bits 0 to 5 up, down, left, right, fire 1 and fire 2
+wiring gx4000 "$work/gx" CPRT "$work/gx.panel" 8 10 "9.0 9.1 9.2 9.3 9.4 9.5 6.0 6.1 6.2 6.3 6.4 6.5" \
+	"P1 Up" "P1 Down" "P1 Left" "P1 Right" "P1 Button 1" "P1 Button 2" "P2 Up" "P2 Down" "P2 Left" "P2 Right" "P2 Button 1" "P2 Button 2"
 lg_pad="$(stream "$work/gx-idle.out" | tail -1 | awk '{print $NF}')"
 gr_dir="$work/gx"; "$wbxrun" "$core" "$work/gx-nopad" --frames 120 --report 120 > "$work/gx-nopad.out" 2>&1 || true
 lg_none="$(stream "$work/gx-nopad.out" | tail -1 | awk '{print $NF}')"
@@ -245,13 +266,16 @@ machine_tests() { # <label> <folder> <frames>
 machine_tests gx4000 "$work/gx" 600
 
 # ------------------------------------ 3. machines that need firmware
-for m in intv:3000 channelf:1500 vectrex:1500; do
+for m in intv:3000 channelf:1500 vectrex:1500 a7800:1500 odyssey2:1500 cpc:3000; do
 	name="${m%%:*}"; frames="${m#*:}"
 	if [ ! -f "$roms/$name/settings" ]; then
 		report SKIP "$name: its tests" "no folder $roms/$name"
 		continue
 	fi
 	copy_folder "$roms/$name" "$name"
+	# the 7800's game is a cartridge the test writes (its folder holds the BIOS)
+	[ "$name" = a7800 ] && python3 "$root/tests/make-a78.py" "$work/a7800/test.a78" > /dev/null
+	[ "$name" = odyssey2 ] && python3 "$root/tests/make-o2.py" "$work/odyssey2/test.bin" > /dev/null
 	"$wbxrun" "$core" "$work/$name" --frames 1 --list-panel > "$work/$name.panel" 2> /dev/null || true
 	reported "$work/$name.panel" > "$work/$name.core-names"
 	declared "$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['machine'])" "$roms/$name/settings")" > "$work/$name.declared-names"
@@ -259,6 +283,23 @@ for m in intv:3000 channelf:1500 vectrex:1500; do
 		same "$work/$name.core-names" "$work/$name.declared-names"
 	machine_tests "$name" "$work/$name" "$frames"
 done
+# the 7800's wiring, through MAME's driver: P1's directions are SWCHA's high
+# four bits and P2's its low four; each button of a two-button joystick sets
+# its own TIA input and clears its player's fire input; the console's
+# switches are SWCHB's bits 0, 1 and 3
+if [ -f "$work/a7800/test.a78" ]; then
+	wiring a7800 "$work/a7800" A78T "$work/a7800.panel" 2 12 \
+		"0.4 0.5 0.6 0.7 7.7+,10.7 6.7+,10.7 0.0 0.1 0.2 0.3 9.7+,11.7 8.7+,11.7 1.0 1.1 1.3" \
+		"P1 Up" "P1 Down" "P1 Left" "P1 Right" "P1 Button 1" "P1 Button 2" \
+		"P2 Up" "P2 Down" "P2 Left" "P2 Right" "P2 Button 1" "P2 Button 2" Reset Select Pause
+fi
+# the Odyssey 2's wiring: joystick 0 is P1 and joystick 1 P2, each read on
+# the data bus with up, right, down and left in bits 0 to 3 and fire in bit 4
+if [ -f "$work/odyssey2/test.bin" ]; then
+	wiring odyssey2 "$work/odyssey2" 'O2T!' "$work/odyssey2.panel" 22 2 \
+		"0.0 0.2 0.3 0.1 0.4 1.0 1.2 1.3 1.1 1.4" \
+		"P1 Up" "P1 Down" "P1 Left" "P1 Right" "P1 Button 1" "P2 Up" "P2 Down" "P2 Left" "P2 Right" "P2 Button 1"
+fi
 # a firmware file missing: the machine is not built, and the file is named
 if [ -f "$roms/intv/settings" ]; then
 	copy_folder "$roms/intv" intv-nogrom

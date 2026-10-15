@@ -173,6 +173,11 @@ std::string ascii_name(std::string name)
 		{ "\xe2\x86\x90", "Cursor Left" }, { "\xe2\x86\x92", "Cursor Right" },
 		{ "\xe2\x86\x96", "Home" }, { "\xc2\xa3", "Pound" }, { "\xc3\x97", "Times" },
 		{ "\xc3\xb7", "Divide" }, { "\xc2\xa8", "Diaeresis" }, { "\xd0\xaa", "Hard Sign" },
+		{ "?", "Question" }, { "\xc2\xa2", "Cent" }, { "\xc2\xa6", "Broken Bar" }, { "\xe2\x82\xa7", "Peseta" },
+		{ "\xc3\x84", "A Umlaut" }, { "\xc3\x85", "A Ring" }, { "\xc3\x89", "E Acute Capital" },
+		{ "\xc3\x96", "O Umlaut" }, { "\xc3\x9c", "U Umlaut" }, { "\xc3\xa0", "A Grave" },
+		{ "\xc3\xa7", "C Cedilla" }, { "\xc3\xa8", "E Grave" }, { "\xc3\xa9", "E Acute" },
+		{ "\xc3\xb1", "N Tilde" }, { "\xc3\x91", "N Tilde Capital" }, { "\xc3\xb9", "U Grave" },
 	};
 	for (auto const &sp : spelled)
 		for (size_t at; (at = name.find(sp.first)) != std::string::npos;)
@@ -257,8 +262,27 @@ void controls_of(ioport_list const &ports, std::vector<control> &buttons, std::v
 			f.device = port.second->device().tag();
 			if (is_nameless(type))
 			{
-				if (!field.specific_name()) continue;
-				f.base = ascii_name(field.specific_name());
+				std::string name;
+				if (field.specific_name())
+					name = field.specific_name();
+				else if (type == IPT_KEYBOARD)
+				{
+					// a key the driver names only by what it types: MAME's own
+					// name for it (ioport_field_live), the names of its
+					// characters one after another ("1 !"), and a letter's key
+					// by its capital letter ("A", not "a A")
+					std::vector<char32_t> const plain = field.keyboard_codes(0);
+					if (plain.size() == 1 && plain[0] >= 'a' && plain[0] <= 'z')
+						name = std::string(1, char(plain[0] - 'a' + 'A'));
+					else
+						for (int which = 0; which < (1 << (UCHAR_SHIFT_END - UCHAR_SHIFT_BEGIN + 1)); which++)
+						{
+							if (field.keyboard_codes(which).empty()) break;
+							name += (name.empty() ? "" : " ") + field.key_name(which);
+						}
+				}
+				if (name.empty()) continue;
+				f.base = ascii_name(name);
 				f.player = 0;
 				f.group = 1;
 				f.order = sequence++;

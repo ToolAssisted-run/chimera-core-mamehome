@@ -176,6 +176,8 @@ def binding(name, keyboard):
     if b in CONSOLE:
         return CONSOLE[b]
     if keyboard:
+        # a key MAME names by its characters ("1 !"): by its first
+        b = b.split(" ")[0] if b not in KEYS and " " in b and len(b.split(" ")[0]) == 1 else b
         if b in KEYS:
             return KEYS[b]
         if re.fullmatch(r"[A-Z]", b):

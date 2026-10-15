@@ -60,7 +60,8 @@ TI calculators (see "Not done").
 
 - MAME's libraries: about 5 minutes a flavor on 14 processors. `core.wbx` is
   67 MB.
-- The test script: 36 passed, 0 failed, 0 skipped, with the local folders.
+- The test script: 59 passed, 0 failed, 0 skipped, with the local folders
+  (on 2026-10-15, after the 7800, Odyssey 2 and CPC folders were added).
   - The package is what the walk gives (24 machines, 18 settings, 30
     firmware files), and Chimera's own package checks pass (18).
   - The GX4000, on a cartridge the test writes (`tests/make-cpr.py`): it
@@ -68,8 +69,16 @@ TI calculators (see "Not done").
     own bit of the keyboard matrix, the CPC's wiring (joystick 1 row 9,
     joystick 2 row 6, bits 0 to 5); no lag frame when it reads the
     joysticks, every frame a lag frame when it reads nothing.
+  - The 7800 (PAL BIOS, a cartridge the test writes): P1's directions are
+    SWCHA's high four bits and P2's its low four; each button of a
+    two-button joystick sets its own TIA input and clears its player's fire
+    input; Reset, Select and Pause are SWCHB's bits 0, 1 and 3.
+  - The Odyssey 2 (a cartridge the test writes): each joystick read on the
+    data bus, up, right, down, left and fire in bits 0 to 4.
+  - The default key bindings name only keys Chimera sends (205 names).
   - For the GX4000, the Intellivision (Astrosmash), the Channel F (its
-    built-in games) and the Vectrex (Mine Storm): the sandbox gives the
+    built-in games), the Vectrex (Mine Storm), the 7800, the Odyssey 2 and
+    the CPC6128 (BASIC, its keys pressed at random): the sandbox gives the
     reference's digests every 50 frames under a wander over every control;
     a run without the wander differs; a state saved and loaded every frame,
     and a state moved to a new sandbox, change nothing.
@@ -93,14 +102,15 @@ TI calculators (see "Not done").
 
 ## Firmware the owner's folder has
 
-- Intellivision: the Executive ROM and the GROM match MAME's.
-- Channel F: all three of MAME's files match.
-- Vectrex: BizHawk's `VEC_Minestorm.vec` is MAME's `exec_rom.bin` (the 8 KB
-  ROM with Mine Storm). BizHawk's 4 KB BIOS file is its second half.
-- Odyssey 2: the BIOS files match, but MAME also needs the 8244 video chip's
-  character ROM (`charset_i8244.bin`), which BizHawk keeps in its code.
-- Atari 7800: no BIOS. MAME needs it for the NTSC machine.
-- Amstrad CPC: no ROMs (the GX4000 and the CPC+ machines need none).
+Every file the tested machines need matches MAME's: the Intellivision's
+Executive ROM and GROM, the Channel F's three ROMs, the Vectrex's 8 KB ROM
+(BizHawk's `VEC_Minestorm.vec`; BizHawk's 4 KB BIOS file is its second
+half), the 7800's NTSC and PAL BIOSes, the Odyssey 2's BIOS and the 8244
+video chip's character ROM (`charset_i8244.bin`, which BizHawk keeps in its
+code), and the CPC464, CPC664 and CPC6128 ROMs with the disk ROM. The
+owner's folder has no game for the 7800, the Odyssey 2 or the CPC, so the
+tests write their own cartridges (tests/make-a78.py, tests/make-o2.py) and
+the CPC runs BASIC.
 
 ## Not done
 
