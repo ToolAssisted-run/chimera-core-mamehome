@@ -1,0 +1,138 @@
+{
+  "package": "mamehome",
+  "effectiveTerms": "GPL-2.0 (MAME as a whole)",
+  "commercialUse": "allowed under the GPL",
+  "note": "The built core combines this repository's integration (MIT) with MAME, which as a whole is made available under the GNU GPL version 2 or later (extern/mame/COPYING); most of its drivers and devices are BSD-3-Clause, and some are GPL-2.0 or LGPL-2.1, as their own headers say. MAME's third-party libraries linked in are permissive: expat and utf8proc MIT, zlib Zlib, FLAC and zstd BSD-3-Clause, SoftFloat 3 BSD-3-Clause, ymfm BSD-3-Clause, WDL's FFT zlib-style, the LZMA SDK public domain, and libjpeg the IJG licence. The core carries MAME's Intellivision cartridge list (hash/intv.hsi, CC0-1.0) as text. The package carries no ROM: a machine's firmware and its games are supplied by the user.",
+  "components": [
+    {
+      "name": "chimera-core-mamehome (integration)",
+      "license": "MIT, and MAME's terms for patches/",
+      "url": "https://github.com/ToolAssisted-run/chimera-core-mamehome",
+      "commit": "{selfCommit}",
+      "file": "LICENSE",
+      "sourceUrl": "https://github.com/ToolAssisted-run/chimera-core-mamehome/archive/{commit}.tar.gz"
+    },
+    {
+      "name": "MAME",
+      "license": "GPL-2.0-or-later as a whole; most drivers and devices BSD-3-Clause",
+      "url": "https://github.com/mamedev/mame",
+      "commit": "{submodule:extern/mame}",
+      "file": "extern/mame/COPYING",
+      "sourceUrl": "https://github.com/mamedev/mame/archive/{commit}.tar.gz"
+    },
+    {
+      "name": "BSD-3-Clause (MAME's text, for most drivers and devices)",
+      "license": "BSD-3-Clause",
+      "url": "https://github.com/mamedev/mame/tree/master/docs/legal",
+      "file": "extern/mame/docs/legal/BSD-3-Clause"
+    },
+    {
+      "name": "GPL-2.0 (MAME's text)",
+      "license": "GPL-2.0",
+      "url": "https://github.com/mamedev/mame/tree/master/docs/legal",
+      "file": "extern/mame/docs/legal/GPL-2.0"
+    },
+    {
+      "name": "LGPL-2.1 (MAME's text, for the files that say so)",
+      "license": "LGPL-2.1",
+      "url": "https://github.com/mamedev/mame/tree/master/docs/legal",
+      "file": "extern/mame/docs/legal/LGPL-2.1"
+    },
+    {
+      "name": "BSD-2-Clause (MAME's text, for the files that say so)",
+      "license": "BSD-2-Clause",
+      "url": "https://github.com/mamedev/mame/tree/master/docs/legal",
+      "file": "extern/mame/docs/legal/BSD-2-Clause"
+    },
+    {
+      "name": "MIT (MAME's text, for the files that say so)",
+      "license": "MIT",
+      "url": "https://github.com/mamedev/mame/tree/master/docs/legal",
+      "file": "extern/mame/docs/legal/MIT"
+    },
+    {
+      "name": "CC0 (MAME's text, for the files that say so)",
+      "license": "CC0-1.0",
+      "url": "https://github.com/mamedev/mame/tree/master/docs/legal",
+      "file": "extern/mame/docs/legal/CC0"
+    },
+    {
+      "name": "Boost Software License (MAME's text, for Asio)",
+      "license": "BSL-1.0",
+      "url": "https://github.com/mamedev/mame/tree/master/docs/legal",
+      "file": "extern/mame/docs/legal/BSL-1.0"
+    },
+    {
+      "name": "Zlib licence (MAME's text, for the files that say so)",
+      "license": "Zlib",
+      "url": "https://github.com/mamedev/mame/tree/master/docs/legal",
+      "file": "extern/mame/docs/legal/Zlib"
+    },
+    {
+      "name": "Expat (bundled by MAME)",
+      "license": "MIT",
+      "url": "https://libexpat.github.io",
+      "file": "extern/mame/3rdparty/expat/COPYING"
+    },
+    {
+      "name": "zlib (bundled by MAME)",
+      "license": "Zlib",
+      "url": "https://zlib.net",
+      "file": "extern/mame/3rdparty/zlib/LICENSE"
+    },
+    {
+      "name": "FLAC (bundled by MAME)",
+      "license": "BSD-3-Clause",
+      "url": "https://xiph.org/flac",
+      "file": "extern/mame/3rdparty/flac/COPYING.Xiph"
+    },
+    {
+      "name": "Zstandard (bundled by MAME)",
+      "license": "BSD-3-Clause",
+      "url": "https://github.com/facebook/zstd",
+      "file": "extern/mame/3rdparty/zstd/LICENSE"
+    },
+    {
+      "name": "utf8proc (bundled by MAME)",
+      "license": "MIT",
+      "url": "https://github.com/JuliaStrings/utf8proc",
+      "file": "extern/mame/3rdparty/utf8proc/LICENSE.md"
+    },
+    {
+      "name": "Berkeley SoftFloat 3 (bundled by MAME)",
+      "license": "BSD-3-Clause",
+      "url": "http://www.jhauser.us/arithmetic/SoftFloat.html",
+      "file": "extern/mame/3rdparty/softfloat3/COPYING.txt"
+    },
+    {
+      "name": "ymfm (bundled by MAME)",
+      "license": "BSD-3-Clause",
+      "url": "https://github.com/aaronsgiles/ymfm",
+      "file": "extern/mame/3rdparty/ymfm/LICENSE"
+    },
+    {
+      "name": "WDL FFT (bundled by MAME)",
+      "license": "WDL (zlib-style)",
+      "url": "https://www.cockos.com/wdl",
+      "file": "extern/mame/3rdparty/wdlfft/fft.h"
+    },
+    {
+      "name": "LZMA SDK (bundled by MAME)",
+      "license": "Public domain",
+      "url": "https://www.7-zip.org/sdk.html",
+      "file": "extern/mame/3rdparty/lzma/DOC/lzma-sdk.txt"
+    },
+    {
+      "name": "libjpeg (bundled by MAME)",
+      "license": "IJG",
+      "url": "https://ijg.org",
+      "file": "extern/mame/3rdparty/libjpeg/README"
+    },
+    {
+      "name": "libco (ares)",
+      "license": "ISC",
+      "url": "https://github.com/ares-emulator/ares",
+      "file": "waterbox/libco/README"
+    }
+  ]
+}

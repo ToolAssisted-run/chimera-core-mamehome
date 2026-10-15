@@ -1,0 +1,37 @@
+--- a/src/emu/romload.cpp
++++ b/src/emu/romload.cpp
+@@ -21,6 +21,10 @@
+ 
+ #include "corestr.h"
+ #include "path.h"
++#if defined(CHIMERA_CORE)
++#include "ioprocsvec.h"
++#include <list>
++#endif
+ 
+ #include <algorithm>
+ #include <cstdarg>
+@@ -1117,6 +1121,23 @@ std::error_condition rom_load_manager::open_disk_diff(
+ 		chd_file &source,
+ 		chd_file &diff_chd)
+ {
++#if defined(CHIMERA_CORE)
++	// chimera: what a machine writes to its hard disk is kept in memory, as an
++	// uncompressed differencing image over the one it was given. MAME keeps
++	// it in a file beside the image; the sandbox a Chimera core runs in has
++	// no file to write, and a disk that kept one run's changes would make the
++	// next run a different machine. In memory it is part of a savestate.
++	{
++		static std::list<std::vector<u8>> s_bytes;
++		static std::list<util::vector_read_write_adapter<u8>> s_files;
++		util::vector_read_write_adapter<u8> &file = s_files.emplace_back(s_bytes.emplace_back());
++		chd_codec_type compression[4] = { CHD_CODEC_NONE };
++		std::error_condition err = diff_chd.create(file, source.logical_bytes(), source.hunk_bytes(), compression, source);
++		if (err)
++			return err;
++		return diff_chd.clone_all_metadata(source);
++	}
++#endif
+ 	// TODO: use system name and/or software list name in the path - the current setup doesn't scale
+ 	std::string fname = romp->name() + ".dif";
+ 

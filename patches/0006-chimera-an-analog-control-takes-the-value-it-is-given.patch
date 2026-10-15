@@ -1,0 +1,19 @@
+--- a/src/emu/ioport.cpp
++++ b/src/emu/ioport.cpp
+@@ -3847,7 +3847,16 @@
+ void analog_field::set_value(s32 value)
+ {
+ 	m_use_adjoverride = true;
++#if defined(CHIMERA_CORE)
++	// chimera: the value is the port's bits as the frontend worked them out,
++	// inside the control's own range. Clamping here goes wrong for a control
++	// whose range is written as signed (a minimum of 0x80 and a maximum of
++	// 0x7f): the minimum is then above the maximum and every value is pinned
++	// to one end.
++	m_adjoverride = value;
++#else
+ 	m_adjoverride = std::clamp(value, m_adjmin, m_adjmax);
++#endif
+ }
+ 
+ 

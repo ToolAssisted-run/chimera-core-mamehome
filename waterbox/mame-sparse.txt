@@ -1,0 +1,19 @@
+# The part of MAME this core builds (waterbox/checkout-mame.sh): everything
+# but what an arcade core never compiles or reads - the software lists of the
+# home systems (hash/), the desktop renderer (bgfx and its two libraries),
+# the artwork, the Android project and the manual.
+/*
+!/hash/
+/hash/intv.hsi
+!/android-project/
+!/artwork/
+!/bgfx/
+!/docs/
+/docs/legal/
+!/3rdparty/bgfx/
+!/3rdparty/bx/
+!/3rdparty/bimg/
+!/3rdparty/SDL2/
+!/3rdparty/SDL3/
+!/3rdparty/portaudio/
+!/3rdparty/portmidi/

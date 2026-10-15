@@ -1,0 +1,25 @@
+{
+  "_comment": "This file lists the files a project of this core takes. Chimera's New Project window is built from it. A project file records its files under the slot ids used here.",
+  "slots": [
+    {
+      "id": "game",
+      "title": "Game",
+      "min": 1,
+      "max": 4,
+      "formats": [
+        "a78", "bin", "int", "itv", "rom", "vec", "gam", "chf", "cpr", "dsk", "ipf", "cdt", "wav", "sna"
+      ],
+      "help": "The game: a cartridge (.a78 for the Atari 7800; .int, .itv, .bin or .rom for the Intellivision; .vec, .gam or .bin for the Vectrex; .bin or .rom for the Odyssey 2; .chf or .bin for the Channel F; .cpr for the GX4000 and the CPC+), or for an Amstrad CPC a disk (.dsk), a tape (.cdt, .wav) or a snapshot (.sna). Each file goes into the first of the machine's drives or slots that takes its kind: a second disk goes into the second drive. The Machine setting says which machine it is."
+    },
+    {
+      "id": "savedata",
+      "title": "Save data",
+      "min": 0,
+      "max": 16,
+      "formats": [
+        "nv"
+      ],
+      "help": "What the machine keeps when the power is off, in the files Export Save Data wrote. Each file is put back into the device it came from before the first frame. With none, the machine starts as it left the factory."
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+--- a/src/emu/sound.h
++++ b/src/emu/sound.h
+@@ -135,6 +135,15 @@ public:
+ 	int unique_id() { return m_unique_id++; }
+ 	bool no_sound() const { return m_nosound_mode; }
+ 
++#if defined(CHIMERA_CORE)
++	// chimera: the sound made up to now, handed out at the end of every frame.
++	// MAME updates its streams 50 times a second whatever the screen does; a
++	// Chimera core hands out one frame's sound per frame, so the frame's end
++	// flushes what the last periodic update has not. Deterministic: the same
++	// calls at the same emulated moments on every run.
++	void chimera_flush() { update(0); }
++#endif
++
+ 	const typename osd::audio_info &get_osd_info() const { return m_osd_info; }
+ 	const std::vector<mapping> &get_mappings() const { return m_mappings; }
+ 

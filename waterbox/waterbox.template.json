@@ -1,0 +1,37 @@
+{
+  "coreName": "MAME Home Systems",
+  "author": "The MAME team; chimera port by Sergio Martin",
+  "url": "https://github.com/ToolAssisted-run/chimera-core-mamehome",
+  "romFile": "game",
+  "deterministic": true,
+  "suggestSettings": true,
+  "memoryLayoutMiB": [
+    1024,
+    8,
+    8,
+    64,
+    1024
+  ],
+  "_memoryLayoutMiB_note": "sbrk, sealed, invisible, plain, mmap. This is room, not use: memory is taken as a machine touches it.",
+  "video": {
+    "_comment": "The BUFFER CAPACITY. Each machine has its own picture size, so the live size comes from GetVideoWidth/Height every frame, and the shape its screen was shown in from GetDisplayAspectX/Y.",
+    "width": 2048,
+    "height": 2048,
+    "virtualWidth": 640,
+    "virtualHeight": 480,
+    "vsyncNumerator": 60000,
+    "vsyncDenominator": 1000,
+    "_vsync_note": "Every machine has its own refresh rate; GetVsyncNumerator reports the screen's, in thousandths of a hertz.",
+    "getBgra": "GetVideoBgra"
+  },
+  "audio": {
+    "_comment": "MAME's mix of the machine's sound, 48 kHz stereo, all of a frame's at its end.",
+    "rate": 48000,
+    "samplesPerFrame": 4096,
+    "channels": 2,
+    "get": "GetAudio"
+  },
+  "lag": {
+    "inputWasRead": "InputWasRead"
+  }
+}

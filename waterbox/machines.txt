@@ -1,0 +1,28 @@
+# The machines this core offers, by MAME's short name, with the system each
+# one is (the id a movie records). gen-config.py writes the package from
+# these and from `run-native --walk`. A machine of the build not listed here
+# is not offered.
+a7800      A78         Atari 7800
+a7800p     A78         Atari 7800
+intv       INTV        Intellivision
+intv2      INTV        Intellivision
+intvsrs    INTV        Intellivision
+intvoice   INTV        Intellivision
+intvecs    INTV        Intellivision
+vectrex    VEC         Vectrex
+odyssey2   O2          Odyssey 2
+videopac   O2          Odyssey 2
+videopacf  O2          Odyssey 2
+videopacp  O2          Odyssey 2
+jopac      O2          Odyssey 2
+channelf   ChannelF    Channel F
+channlf2   ChannelF    Channel F
+cpc464     AmstradCPC  Amstrad CPC
+cpc664     AmstradCPC  Amstrad CPC
+cpc6128    AmstradCPC  Amstrad CPC
+cpc6128f   AmstradCPC  Amstrad CPC
+cpc6128s   AmstradCPC  Amstrad CPC
+cpc6128sp  AmstradCPC  Amstrad CPC
+cpc464p    AmstradCPC  Amstrad CPC
+cpc6128p   AmstradCPC  Amstrad CPC
+gx4000     AmstradCPC  Amstrad CPC

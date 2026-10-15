@@ -1,0 +1,65 @@
+--- a/src/emu/ioport.cpp
++++ b/src/emu/ioport.cpp
+@@ -40,6 +40,11 @@
+ #include <type_traits>
+ 
+ 
++#if defined(CHIMERA_CORE)
++void chimera_port_read(ioport_port &port);     // the Chimera core's frontend
++static int s_chimera_own_reads;                // MAME reading a port for itself
++#endif
++
+ namespace {
+ 
+ // temporary: set this to 1 to enable the originally defined behavior that
+@@ -635,7 +640,13 @@ bool ioport_condition::eval() const
+ 		return true;
+ 
+ 	// otherwise, read the referenced port and switch off the condition type
++#if defined(CHIMERA_CORE)
++	s_chimera_own_reads++;
++	ioport_value const condvalue = m_port->read();
++	s_chimera_own_reads--;
++#else
+ 	ioport_value const condvalue = m_port->read();
++#endif
+ 	switch (m_condition)
+ 	{
+ 		case ALWAYS:            return true;
+@@ -1576,6 +1587,7 @@ ioport_field *ioport_port::field(ioport_value mask) const
+ }
+ 
+ 
++
+ //-------------------------------------------------
+ //  read - return the value of an I/O port
+ //-------------------------------------------------
+@@ -1585,6 +1597,14 @@ ioport_value ioport_port::read()
+ 	if (!manager().safe_to_read())
+ 		throw emu_fatalerror("Input ports cannot be read at init time!");
+ 
++#if defined(CHIMERA_CORE)
++	// chimera: the frontend counts the frames in which the game read none of
++	// its controls (a "lag frame"), so it is told of every port read that
++	// is the machine's - not of MAME's own once-a-frame look at every port
++	if (!s_chimera_own_reads)
++		chimera_port_read(*this);
++#endif
++
+ 	// start with the digital state
+ 	ioport_value result = m_live->digital;
+ 
+@@ -2192,7 +2212,13 @@ void ioport_manager::frame_update()
+ 		record_port(*port.second.get());
+ 
+ 		// call device line write handlers
++#if defined(CHIMERA_CORE)
++		s_chimera_own_reads++;
+ 		ioport_value newvalue = port.second->read();
++		s_chimera_own_reads--;
++#else
++		ioport_value newvalue = port.second->read();
++#endif
+ 		for (dynamic_field &dynfield : port.second->live().writelist)
+ 			if (dynfield.field().type() != IPT_OUTPUT)
+ 				dynfield.write(newvalue);

@@ -1,0 +1,32 @@
+--- a/src/osd/modules/file/posixfile.cpp
++++ b/src/osd/modules/file/posixfile.cpp
+@@ -266,6 +266,29 @@ std::error_condition osd_file::open(std::string const &path, std::uint32_t openf
+ 	fd = ::open64(dst.c_str(), access, 0666);
+ #endif
+ 
++#if defined(CHIMERA_CORE)
++	// chimera: a file asked for inside a folder named after the system -
++	// x68000/iplrom.dat - is also found beside where that folder would be.
++	// The sandbox a Chimera core runs in has no directories, only the files a
++	// project mounts, by name; and a native run is pointed at a firmware
++	// folder of loose files. Reading only: nothing is ever created this way.
++	if (fd < 0 && !(openflags & OPEN_FLAG_WRITE))
++	{
++		auto const sep = dst.rfind(PATHSEPCH);
++		if (sep != std::string::npos)
++		{
++			auto const parent = dst.rfind(PATHSEPCH, sep ? sep - 1 : 0);
++			std::string flat = (parent == std::string::npos || parent >= sep)
++				? dst.substr(sep + 1)
++				: dst.substr(0, parent + 1) + dst.substr(sep + 1);
++			// "./name" is "name": the sandbox's files have bare names only
++			if (flat.compare(0, 2, "./") == 0)
++				flat.erase(0, 2);
++			fd = ::open(flat.c_str(), access, 0666);
++		}
++	}
++#endif
++
+ 	if (fd < 0)
+ 	{
+ 		// save the error from the first attempt to open the file

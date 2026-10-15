@@ -1,0 +1,10 @@
+# The MAME driver files this core builds (paths under src/mame), and with
+# them every machine they declare. MAME's build works out the processors,
+# chips and devices they need.
+atari/a7800.cpp
+mattel/intv.cpp
+miltonbradley/vectrex.cpp
+philips/odyssey2.cpp
+fairchild/channelf.cpp
+amstrad/amstrad.cpp
+ti/ti85.cpp

@@ -1,0 +1,41 @@
+--- a/src/emu/hashfile.cpp
++++ b/src/emu/hashfile.cpp
+@@ -19,6 +19,12 @@
+ 
+ #include <pugixml.hpp>
+ 
++#if defined(CHIMERA_CORE)
++// the Chimera core's frontend: the hash files it carries, by system name
++// ("intv"), or nullptr. A sandboxed core has no folder to read them from.
++const char *chimera_hash_file(const char *sysname);
++#endif
++
+ 
+ /*-------------------------------------------------
+     hashfile_lookup
+@@ -26,14 +32,22 @@
+ 
+ static bool read_hash_config(const char *hash_path, const util::hash_collection &hashes, const char *sysname, std::string &result)
+ {
++	pugi::xml_document doc;
++	pugi::xml_parse_result res;
++#if defined(CHIMERA_CORE)
++	(void)hash_path;
++	if (const char *carried = chimera_hash_file(sysname))
++		res = doc.load_string(carried);
++	else
++		return false;
++#else
+ 	/* open a file */
+ 	emu_file file(hash_path, OPEN_FLAG_READ);
+ 	if (file.open(std::string(sysname) + ".hsi"))
+ 		return false;
+ 
+-	pugi::xml_document doc;
+-
+-	pugi::xml_parse_result res = doc.load_file(file.fullpath());
++	res = doc.load_file(file.fullpath());
++#endif
+ 	if (res)
+ 	{
+ 		// Do search by CRC32 and SHA1

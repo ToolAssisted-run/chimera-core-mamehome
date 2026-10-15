@@ -1,0 +1,51 @@
+--- a/src/osd/modules/lib/osdlib_unix.cpp
++++ b/src/osd/modules/lib/osdlib_unix.cpp
+@@ -12,7 +12,10 @@
+ #include "osdcore.h"
+ #include "osdlib.h"
+ 
+-#ifdef SDLMAME_SDL3
++#if defined(CHIMERA_CORE)
++// chimera: no SDL in a Chimera core; its only use here is the clipboard, and a
++// sandboxed machine has none (see osd_get_clipboard_text below)
++#elif defined(SDLMAME_SDL3)
+ #include <SDL3/SDL.h>
+ #else
+ #include <SDL2/SDL.h>
+@@ -156,6 +159,10 @@ std::error_condition osd_set_clipboard_text(std::string_view text) noexcept
+ 
+ std::string osd_get_clipboard_text() noexcept
+ {
++#if defined(CHIMERA_CORE)
++	// the host's clipboard would be input that no movie records
++	return std::string();
++#else
+ 	// TODO: better error handling
+ 	std::string result;
+ 
+@@ -175,6 +182,7 @@ std::string osd_get_clipboard_text() noexcept
+ 		}
+ 	}
+ 	return result;
++#endif
+ }
+ 
+ 
+@@ -184,6 +192,9 @@ std::string osd_get_clipboard_text() noexcept
+ 
+ std::error_condition osd_set_clipboard_text(std::string_view text) noexcept
+ {
++#if defined(CHIMERA_CORE)
++	return std::errc::operation_not_supported;
++#else
+ 	try
+ 	{
+ 		std::string const clip(text); // need to do this to ensure there's a terminating NUL for SDL
+@@ -203,6 +214,7 @@ std::error_condition osd_set_clipboard_text(std::string_view text) noexcept
+ 	{
+ 		return std::errc::not_enough_memory;
+ 	}
++#endif
+ }
+ #endif
+ 
