@@ -273,6 +273,40 @@ if [ -f "$roms/intv/settings" ]; then
 fi
 
 # ------------------------------------------------ 4. Chimera's own checks
+# Through Chimera's engine, as a project with a movie, the way the window
+# plays one: the GX4000 cartridge with P1 Up held in the movie, beside the
+# same project with an idle movie; the joystick's row in memory says which.
+if [ -x "$run" ] && [ -f "$pkg" ]; then
+	for mv in up idle; do
+		[ "$mv" = up ] && press="press=P1 Up:100:100" || press="press=P1 Down:0:0"
+		python3 "$root/tests/make-project.py" "$pkg" "$work/gx-$mv.chimeraProject" 200 machine=gx4000 "$press" \
+			-- "game=$work/gx/test.cpr" > "$work/gx-$mv.project.log" 2>&1 || true
+		"$run" --project "$work/gx-$mv.chimeraProject" "$pkg" --files "$work/gx" \
+			--dump "RAM Slot/:ram/0/m_pointer=$work/gx-$mv.engine.ram" > "$work/gx-$mv.engine" 2>&1 || true
+	done
+	row9() { od -An -tx1 -j $((0x8011)) -N1 "$1" 2> /dev/null | tr -d ' '; }
+	check "gx4000: a project's movie reaches the machine in Chimera's engine" "joystick row: $(row9 "$work/gx-up.engine.ram") held, $(row9 "$work/gx-idle.engine.ram") idle" \
+		sh -c "grep -q '^frames=200' '$work/gx-up.engine' && [ '$(row9 "$work/gx-up.engine.ram")' = fe ] && [ '$(row9 "$work/gx-idle.engine.ram")' = ff ]"
+	if [ -f "$roms/intv/settings" ]; then
+		fw=""
+		for f in exec.bin ro-3-9503-003.u21; do fw="$fw --firmware $f=$roms/intv/$f"; done
+		for mv in enter idle; do
+			[ "$mv" = enter ] && press="press=P1 Enter:200:10" || press="press=P1 Enter:0:0"
+			python3 "$root/tests/make-project.py" "$pkg" "$work/intv-$mv.chimeraProject" 400 machine=intv "$press" \
+				"config.Controller Disc Emulation=Digital" "panel=$work/intv.panel" \
+				-- "game=$roms/intv/astrosmash.int" > "$work/intv-$mv.project.log" 2>&1 || true
+			# shellcheck disable=SC2086
+			"$run" --project "$work/intv-$mv.chimeraProject" "$pkg" --files "$roms/intv" $fw \
+				--screenshot "399=$work/intv-$mv.tga" > "$work/intv-$mv.engine" 2>&1 || true
+		done
+		check "intv: a project with its firmware plays a movie in Chimera's engine" "Enter starts Astrosmash" \
+			sh -c "grep -q '^frames=400' '$work/intv-enter.engine' && grep -q '^frames=400' '$work/intv-idle.engine' && ! cmp -s '$work/intv-enter.tga' '$work/intv-idle.tga'"
+	else
+		report SKIP "intv: a project with its firmware plays a movie in Chimera's engine" "no folder $roms/intv"
+	fi
+else
+	report SKIP "gx4000: a project's movie reaches the machine in Chimera's engine" "no chimera-run at $run, or no package"
+fi
 tests="$chimera_root/source/gui/Chimera.Tests.Client.Common/Chimera.Tests.Client.Common.csproj"
 if [ -f "$tests" ] && command -v dotnet > /dev/null 2>&1 && [ -f "$pkg" ]; then
 	if CHIMERA_CORES_DIR="$(dirname "$pkg")" env -u DISPLAY dotnet test "$tests" -c Release --no-build \
