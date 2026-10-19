@@ -176,6 +176,33 @@ users have (the owner's folder has 1.02 to 1.08).
   package (two tests failed), and two controls swapped in the core (the
   wiring test failed).
 
+## Keyboards: their rows and their letters (2026-10-19, chimera#310)
+
+MAME lists a keyboard's keys in the order its matrix is scanned, which on the
+CPC put Cursor Up first and the letters far apart, and the letters a movie
+writes for them were handed out in that order, so Cursor Left took the U and
+the U key got a slash. Now:
+
+- **Rows.** mame-driver.cpp orders a keyboard's keys by a physical layout
+  when one covers at least nine in ten of its keys. There is one, the CPC's
+  (the main block, with the keypad's f-keys at the end of each row); the
+  CPC464, 664, 6128 and the Plus models use it. The AZERTY, Swedish and
+  Spanish CPC6128s name their keys differently and keep MAME's order. The
+  layout is chosen by the keys, not by machine name.
+- **Letters.** gen-config.py first gives each key named by a single
+  character its own ("U" is U, "1 !" is 1, "/ Question" is /, ". >" is >),
+  then shares out the rest as before. A key whose name only starts with a
+  letter ("U Grave") does not take that letter.
+- **A name.** The CPC's key marked with an up arrow and a pound sign is its
+  exponent key, not a cursor key: it was "Cursor Up Pound", it is "Up Arrow
+  Pound". A movie that pressed it under the old name loses that key on replay;
+  every other key keeps its name, and Chimera reads a movie by the names in
+  its first line, so the new order costs nothing else.
+
+The gate leg "keyboards" checks the letters of every machine and the CPC's
+first row; it fails on the package made before this (105 keys without their
+own letter).
+
 ## Firmware the owner's folder has
 
 Every file the tested machines need matches MAME's: the Intellivision's

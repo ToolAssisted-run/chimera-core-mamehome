@@ -75,7 +75,7 @@ PREFERRED = {
     "Button 1": "1", "Button 2": "2", "Button 3": "3", "Button 4": "4", "Button 5": "5", "Button 6": "6",
     "Reset": "r", "Select": "s", "Pause": "p", "Start": "S",
     "Upper": "T", "Lower-Left": "l", "Lower-Right": "g", "Clear": "C", "Enter": "E",
-    "Push Down": "v", "Pull Up": "^", "Twist Clockwise": ">", "Twist Counterclockwise": "<",
+    "Up Arrow Pound": "^", "Push Down": "v", "Pull Up": "^", "Twist Clockwise": ">", "Twist Counterclockwise": "<",
     "Up-Up-Left": "a", "Up-Left": "b", "Left-Up-Left": "c", "Left-Down-Left": "d", "Down-Left": "e",
     "Down-Down-Left": "f", "Down-Down-Right": "h", "Down-Right": "i", "Right-Down-Right": "j",
     "Right-Up-Right": "k", "Up-Right": "m", "Up-Up-Right": "n",
@@ -111,9 +111,42 @@ def letters(buttons):
             yield ch.swapcase()
         yield from POOL
 
+    def own_character(name):
+        """The key's own mark, for a keyboard key named by what it types: "U",
+        "1 !", ", <" (". >" is ">": a dot is not a letter a movie may use).
+        None for a key named by a word ("Cursor Left", "Enter")."""
+        tokens = bare(name).split(" ")
+        for i, token in enumerate(tokens):
+            if len(token) != 1:
+                return None
+            if token in ".|" or not 33 <= ord(token) < 127:
+                continue
+            # a letter is the key's own only when it is the whole name: "U
+            # Grave" is the key that types a u with an accent, and must not
+            # take the U key's letter
+            if token.isalpha() and len(tokens) > 1:
+                return None
+            return token
+        return None
+
     for g, names in groups.items():
         used = set()
+        own = set()
+        # First every key takes its own character where it has one, so that
+        # the U key is U in a movie and in TAStudio (chimera#310); handing
+        # letters out in MAME's order gave "Cursor Left" the U, and the U key
+        # a slash.
         for name in names:
+            key = bare(name)
+            ch = own_character(name)
+            if ch is None or key in declared or ch in used:
+                continue
+            declared[key] = ch
+            used.add(ch)
+            own.add(key)
+        for name in names:
+            if bare(name) in own:
+                continue
             key = bare(name)
             if key in declared and declared[key] not in used:
                 used.add(declared[key])

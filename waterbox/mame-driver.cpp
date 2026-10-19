@@ -194,6 +194,11 @@ std::string without_player(std::string name)
 // any other is "?", which the test script refuses.
 std::string ascii_name(std::string name)
 {
+	// The CPC's key that prints an up arrow and a pound sign is the
+	// exponent key, not a cursor key (chimera#310): its arrow is spelled
+	// as the C64's key of the same mark is, "Up Arrow". A lone arrow is a
+	// cursor key, as on the Intellivision and the Odyssey 2.
+	if (name == "\xe2\x86\x91 \xc2\xa3") return "Up Arrow Pound";
 	static std::pair<const char *, const char *> const spelled[] = {
 		{ "\xe2\x86\x91", "Cursor Up" }, { "\xe2\x86\x93", "Cursor Down" },
 		{ "\xe2\x86\x90", "Cursor Left" }, { "\xe2\x86\x92", "Cursor Right" },
@@ -334,6 +339,40 @@ void controls_of(ioport_list const &ports, std::vector<control> &buttons, std::v
 		}
 	}
 	auto const name_of = [] (found const &f) { return f.player ? "P" + std::to_string(f.player) + " " + f.base : f.base; };
+
+	// A keyboard's keys in the order they sit on it, row by row, where the
+	// keys are those of a keyboard below (chimera#310): MAME lists them in
+	// the order its matrix is scanned, and a person looking for a key in the
+	// controller window or TAStudio looks along the rows. Chosen by the keys
+	// themselves, not by machine: the layout whose keys this keyboard has.
+	// Keys a layout does not name keep MAME's order after it.
+	static std::vector<std::vector<std::string>> const layouts = {
+		{	// Amstrad CPC: the main block, then the keypad (f0-f9) at the end of its row
+			"Esc", "1 !", "2 \" ~", "3 #", "4 $", "5 %", "6 &", "7 '", "8 (", "9 )", "0 _", "- =", "Up Arrow Pound", "Clr", "Del", "Keypad 7", "Keypad 8", "Keypad 9",
+			"Tab", "Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "@ Broken Bar", "[", "Enter", "Keypad 4", "Keypad 5", "Keypad 6",
+			"Caps Lock", "A", "S", "D", "F", "G", "H", "J", "K", "L", ": *", "; +", "]", "Keypad 1", "Keypad 2", "Keypad 3",
+			"Shift", "Z", "X", "C", "V", "B", "N", "M", ", <", ". >", "/ Question", "\\", "Keypad 0", "Cursor Up", "Keypad .",
+			"Ctrl", "Copy", "Space", "Keypad Enter", "Cursor Left", "Cursor Down", "Cursor Right",
+		},
+	};
+	{
+		std::set<std::string> keys;
+		for (found const &f : fields)
+			if (f.group == 1) keys.insert(f.base);
+		for (auto const &layout : layouts)
+		{
+			int named = 0;
+			for (std::string const &k : layout) named += keys.count(k) ? 1 : 0;
+			if (keys.empty() || named * 10 < int(keys.size()) * 9) continue;   // most of this keyboard, or not it
+			for (found &f : fields)
+			{
+				if (f.group != 1) continue;
+				auto const at = std::find(layout.begin(), layout.end(), f.base);
+				f.order = at != layout.end() ? int(at - layout.begin()) : int(layout.size()) + f.order;
+			}
+			break;
+		}
+	}
 
 	// one name from two devices: those devices' controls take a player each
 	std::map<std::string, std::set<std::string>> devices_of;

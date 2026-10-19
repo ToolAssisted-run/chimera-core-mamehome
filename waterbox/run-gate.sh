@@ -179,6 +179,28 @@ declared gx4000 > "$work/gx.declared-names"
 check "gx4000: the core's controls are the package's" "$(wc -l < "$work/gx.declared-names") controls" \
 	same "$work/gx.core-names" "$work/gx.declared-names"
 
+# A keyboard's keys are where a person looks for them (chimera#310): a key named
+# by a single letter or digit writes that character into a movie and heads its
+# TAStudio column with it, and the CPC's keys run along its rows, its top row
+# first. Read from the package, which gen-config.py writes from the core.
+keys_out="$(python3 - "$here/waterbox.config" <<'PYEOF'
+import json, sys
+c = json.load(open(sys.argv[1]))
+bad = []
+for m in c["machines"]:
+    inp = m["input"]
+    for b in inp["buttons"]:
+        if len(b) == 1 and b.isalnum() and inp.get("mnemonics", {}).get(b) != b:
+            bad.append(f"{m['label']}: {b} is {inp.get('mnemonics', {}).get(b)}")
+cpc = next(m for m in c["machines"] if m.get("label") == "Amstrad CPC464")
+top = [b for b in cpc["input"]["buttons"] if not b.startswith("P")][:5]
+if top != ["Esc", "1 !", "2 \" ~", "3 #", "4 $"]:
+    bad.append(f"CPC464 starts {top}")
+print("; ".join(bad) if bad else "ok")
+PYEOF
+)"
+check "keyboards: a letter or digit key is its own letter, and the CPC's keys follow its rows" "$keys_out" [ "$keys_out" = ok ]
+
 # ram <dir> <signature> <out>: the test program's memory (64 bytes) after
 # the run that wrote <dir>'s domains: found by the signature the program
 # leaves 0x30 bytes in
