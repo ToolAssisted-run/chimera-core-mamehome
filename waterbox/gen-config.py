@@ -195,7 +195,7 @@ KEYS = {"Space": "Space", "Return": "Enter", "Enter": "Enter", "Shift": "Shift, 
         "Ctrl": "Ctrl", "Alt": "Alt"}
 
 
-def binding(name, keyboard):
+def binding(name, keyboard, names=()):
     m = re.match(r"^P(\d+) (.+)$", name)
     n, b = (int(m.group(1)), m.group(2)) if m else (0, name)
     if n:
@@ -203,7 +203,8 @@ def binding(name, keyboard):
             text = PAD[b].format(n=n)
             # the keyboard is player 1's alone, and a computer's keys are its own
             if n > 1 or keyboard:
-                text = ", ".join(p for p in text.split(", ") if p.startswith(("J", "X")))
+                # (a pad is "J1 B2" or "X1 B"; the X key is a key, chimera#317)
+                text = ", ".join(p for p in text.split(", ") if re.match(r"[JX]\d+ ", p))
             return text
         if n == 1 and b in KEYPAD:
             return KEYPAD[b]
@@ -211,8 +212,24 @@ def binding(name, keyboard):
     if b in CONSOLE:
         return CONSOLE[b]
     if keyboard:
-        # a key MAME names by its characters ("1 !"): by its first
-        b = b.split(" ")[0] if b not in KEYS and " " in b and len(b.split(" ")[0]) == 1 else b
+        tokens = b.split(" ")
+        if b not in KEYS and len(tokens) > 1 and len(tokens[0]) == 1:
+            # a key MAME names by its characters ("1 !", "& 1"): by its digit,
+            # as a number-row key is the PC's key of that digit on any layout
+            # (the French CPC's "E Acute 2 ~" is its 2 key)
+            digits = [t for t in tokens if re.fullmatch(r"[0-9]", t)]
+            if digits:
+                return "Number" + digits[0]
+            # "U Grave %" types a u with an accent: no PC key is called that,
+            # and the U key is the machine's U (chimera#317). "Y / Yes" is
+            # the Y key.
+            if tokens[0].isalpha() and tokens[1].isalpha() and len(tokens[1]) > 1:
+                return ""
+            b = tokens[0]
+        # a keyboard with a Return and an Enter has its Enter on the keypad,
+        # as the PC has (chimera#317): one key pressed both
+        if b == "Enter" and "Return" in names:
+            return KEYPAD["Enter"]
         if b in KEYS:
             return KEYS[b]
         if re.fullmatch(r"[A-Z]", b):
@@ -315,7 +332,7 @@ def main():
         if name in EXTENSIONS:
             entry["extensions"] = {e: system for e in EXTENSIONS[name]}
         machines.append(entry)
-        keybinds[input_name] = collections.OrderedDict((b, binding(b, keyboard)) for b in m["buttons"])
+        keybinds[input_name] = collections.OrderedDict((b, binding(b, keyboard, m["buttons"])) for b in m["buttons"])
 
     # the settings: the machine, then each machine's BIOS and switches, one
     # declaration for each different one, with the machines that have it
