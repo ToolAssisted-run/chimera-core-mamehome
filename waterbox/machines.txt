@@ -10,11 +10,11 @@ intvsrs    INTV        Intellivision
 intvoice   INTV        Intellivision
 intvecs    INTV        Intellivision
 vectrex    VEC         Vectrex
-odyssey2   O2          Odyssey 2
-videopac   O2          Odyssey 2
-videopacf  O2          Odyssey 2
-videopacp  O2          Odyssey 2
-jopac      O2          Odyssey 2
+odyssey2   O2          Odyssey 2 / Videopac
+videopac   O2          Odyssey 2 / Videopac
+videopacf  O2          Odyssey 2 / Videopac
+videopacp  O2          Odyssey 2 / Videopac
+jopac      O2          Odyssey 2 / Videopac
 channelf   ChannelF    Channel F
 channlf2   ChannelF    Channel F
 cpc464     AmstradCPC  Amstrad CPC

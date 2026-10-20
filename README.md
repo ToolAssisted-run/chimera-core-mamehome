@@ -24,7 +24,7 @@ and the movie records it.
 | Atari 7800 | `a7800` (NTSC), `a7800p` (PAL) |
 | Intellivision | `intv`, `intv2`, `intvsrs` (Sears), `intvoice` (with IntelliVoice), `intvecs` (with the ECS and IntelliVoice) |
 | Vectrex | `vectrex` |
-| Odyssey 2 | `odyssey2`, `videopac`, `videopacf` (C52), `videopacp` (G7400), `jopac` |
+| Odyssey 2 / Videopac | `odyssey2`, `videopac`, `videopacf` (C52), `videopacp` (G7400), `jopac` |
 | Channel F | `channelf`, `channlf2` |
 | Amstrad CPC | `cpc464`, `cpc664`, `cpc6128` and its French, Swedish and Spanish models, `cpc464p`, `cpc6128p`, `gx4000` |
 | TI-83 | `ti83` (OS 1.08 by default; the BIOS setting chooses another) |
