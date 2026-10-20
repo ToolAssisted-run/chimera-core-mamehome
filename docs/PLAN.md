@@ -237,9 +237,8 @@ character ROM, under MAME's names) come from the walk, as for every machine.
   writes the CPC's format, and the BBC's single-density `.ssd` would have
   left as something that is not its own format.
 - The owner has no Acorn ROMs here and decided to publish untested
-  ("Publish untested"): no BBC Micro has been booted, and issue 329 stays
-  open until someone confirms a game runs. The test script runs the BBC's
-  tests when `tests/roms-local/bbc` holds its firmware.
+  ("Publish untested"): no BBC Micro has been booted. The test script runs
+  the BBC's tests when `tests/roms-local/bbc` holds its firmware.
 
 ## Not done
 
