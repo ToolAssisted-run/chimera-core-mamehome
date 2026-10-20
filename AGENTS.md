@@ -1,10 +1,10 @@
 # AGENTS.md - MAME home systems core for Chimera
 
-This repository builds seven home systems of MAME (Atari 7800, Intellivision,
-Vectrex, Odyssey 2, Channel F, Amstrad CPC, TI-83) as one sandboxed guest for
+This repository builds eight home systems of MAME (Atari 7800, Intellivision,
+Vectrex, Odyssey 2, Channel F, Amstrad CPC, TI-83, BBC Micro) as one sandboxed guest for
 Chimera (https://github.com/ToolAssisted-run/chimera), a frontend for
 tool-assisted speedruns. MAME is not forked: its own build system builds its
-libraries for seven driver files, and `waterbox/` replaces its frontend and
+libraries for ten driver files, and `waterbox/` replaces its frontend and
 SDL layer. The result is one file, `mamehome.chimeraCore`: the guest binary
 `core.wbx` plus the declarations Chimera reads. `docs/BUILDING.md` has the
 detail behind every command here, and `docs/PLAN.md` what was decided, what

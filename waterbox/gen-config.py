@@ -192,7 +192,12 @@ CONSOLE = {"Reset": "F1", "Select": "F2", "Pause": "F3",
 KEYS = {"Space": "Space", "Return": "Enter", "Enter": "Enter", "Shift": "Shift, LeftShift", "Control": "Ctrl",
         "Esc": "Escape", "Tab": "Tab", "Caps Lock": "CapsLock", "Del": "Backspace", "Clr": "Delete",
         "Copy": "End", "Cursor Up": "Up", "Cursor Down": "Down", "Cursor Left": "Left", "Cursor Right": "Right",
-        "Ctrl": "Ctrl", "Alt": "Alt"}
+        "Ctrl": "Ctrl", "Alt": "Alt",
+        # the BBC Micro's, which MAME names in capitals; BREAK (which resets
+        # the machine, and with SHIFT boots a disc) goes on Home, as F12 is
+        # Chimera's screenshot
+        "SPACE": "Space", "RETURN": "Enter", "SHIFT": "Shift, LeftShift", "CTRL": "Ctrl", "ESCAPE": "Escape",
+        "TAB": "Tab", "CAPSLOCK": "CapsLock", "DELETE": "Backspace", "COPY": "End", "BREAK": "Home"}
 
 
 def binding(name, keyboard, names=()):
@@ -236,7 +241,10 @@ def binding(name, keyboard, names=()):
             return b
         if re.fullmatch(r"[0-9]", b):
             return "Number" + b
-        m = re.fullmatch(r"f([0-9])", b)
+        # a function key goes on the keypad: the CPC's are there, and the
+        # PC's F keys are Chimera's own (savestates, the screenshot); the BBC
+        # Micro's red keys (F0 to F9) go there too
+        m = re.fullmatch(r"[fF]([0-9])", b)
         if m:
             return "Keypad" + m.group(1)
     return ""
@@ -379,7 +387,7 @@ def main():
         f.write("\n")
     kb = {"_comment": ["Player 1's joystick on the arrows and Z X C V as well as the first pad, player 2's on the second pad; "
                        "the Intellivision's keypad on the number pad; console switches on F1-F3 (Channel F: 1-4); a computer's keys "
-                       "on the PC keys in the same place and its joysticks on the pads only. Everything else ships unbound."],
+                       "on the PC keys in the same place (its function keys on the number pad; the BBC Micro's BREAK on Home) and its joysticks on the pads only. Everything else ships unbound."],
           "AllTrollers": keybinds}
     with open(os.path.join(outdir, "default_keybinds.json"), "w") as f:
         json.dump(kb, f, indent=1, ensure_ascii=True)

@@ -27,3 +27,8 @@ cpc464p    AmstradCPC  Amstrad CPC
 cpc6128p   AmstradCPC  Amstrad CPC
 gx4000     AmstradCPC  Amstrad CPC
 ti83       TI83        TI-83
+bbca       BBC         BBC Micro
+bbcb       BBC         BBC Micro
+bbcbp      BBC         BBC Micro
+bbcbp128   BBC         BBC Micro
+bbcm       BBC         BBC Micro

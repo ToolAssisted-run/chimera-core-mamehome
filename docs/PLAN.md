@@ -215,8 +215,33 @@ owner's folder has no game for the 7800, the Odyssey 2 or the CPC, so the
 tests write their own cartridges (tests/make-a78.py, tests/make-o2.py) and
 the CPC runs BASIC. The TI-83's OS 1.02 to 1.08 match MAME's.
 
+## The BBC Micro (2026-10-20, chimera#329, user-decided)
+
+Chimera issue 329 asked for the BBC Micro. The owner decided to add it here
+rather than build a core of its own: MAME emulates it in software, step by
+step with its 6502, and this core already runs MAME's other home computers.
+`waterbox/drivers.txt` adds MAME's three BBC driver files (`acorn/bbcb.cpp`,
+`bbcbp.cpp`, `bbcm.cpp`; MAME's build finds their companion files), and
+`machines.txt` offers the Model A, Model B, B+ 64K, B+ 128K and Master 128
+as the system "BBC". Their discs (`.ssd`, `.dsd`), tapes (`.uef`), keyboard
+and firmware (the MOS, BASIC, the disc filing system and the teletext
+character ROM, under MAME's names) come from the walk, as for every machine.
+
+- MAME names the BBC's keys in capitals (`SHIFT`, `RETURN`, `BREAK`), which
+  the binding table did not know: they are bound by name like the CPC's,
+  the red function keys on the number pad (the PC's F keys are Chimera's
+  savestate keys) and BREAK on Home (F12 is Chimera's screenshot). The same
+  table gave the Intellivision ECS keyboard's `SHIFT` its Shift.
+- A disc the machine wrote to is handed out by Export Save Data only when it
+  is a `.dsk`: the encoder (patch 0012) reads double-density tracks and
+  writes the CPC's format, and the BBC's single-density `.ssd` would have
+  left as something that is not its own format.
+- The owner has no Acorn ROMs here and decided to publish untested
+  ("Publish untested"): no BBC Micro has been booted, and issue 329 stays
+  open until someone confirms a game runs. The test script runs the BBC's
+  tests when `tests/roms-local/bbc` holds its firmware.
+
 ## Not done
 
 - Chimera's window on Windows not tried (only its headless runner).
-- Not published: a repository, CI, the roster and the README rows are the
-  owner's to decide.
+- The BBC Micro not run with its ROMs.

@@ -1,13 +1,13 @@
 # chimera-core-mamehome
 
-Seven home systems of [MAME](https://github.com/mamedev/mame) as one
+Eight home systems of [MAME](https://github.com/mamedev/mame) as one
 [Chimera](https://github.com/ToolAssisted-run/chimera) core, running in
 miniBox's sandbox: the Atari 7800, the Intellivision, the Vectrex, the
 Odyssey 2 (and Videopac), the Channel F, the Amstrad CPC (with the CPC+ and
-the GX4000) and the TI-83.
+the GX4000), the TI-83 and the BBC Micro.
 
 MAME is not forked: `extern/mame` is upstream at a pinned commit, built with
-MAME's own build system for seven driver files (`waterbox/drivers.txt`),
+MAME's own build system for ten driver files (`waterbox/drivers.txt`),
 with a few small patches in `patches/`. Of that build only the libraries are
 used. MAME's own frontend and its SDL layer are replaced by `waterbox/`: no
 menus, no Lua, no threads, no host clock, no files written. A Chimera frame
@@ -28,11 +28,13 @@ and the movie records it.
 | Channel F | `channelf`, `channlf2` |
 | Amstrad CPC | `cpc464`, `cpc664`, `cpc6128` and its French, Swedish and Spanish models, `cpc464p`, `cpc6128p`, `gx4000` |
 | TI-83 | `ti83` (OS 1.08 by default; the BIOS setting chooses another) |
+| BBC Micro | `bbca` (Model A), `bbcb` (Model B), `bbcbp` and `bbcbp128` (B+ 64K and 128K), `bbcm` (Master 128) |
 
 ## What a project needs
 
 - **The game**: a cartridge, or for a CPC a disk (`.dsk`), a tape (`.cdt`,
-  `.wav`) or a snapshot (`.sna`). Each file goes into the first of the
+  `.wav`) or a snapshot (`.sna`); for a BBC Micro a disc (`.ssd`, `.dsd`) or
+  a tape (`.uef`). Each file goes into the first of the
   machine's slots or drives that takes its kind. A CPC's disks are one list
   for its first drive (see Disks). The Vectrex and the Channel F also start with no
   cartridge (Mine Storm, and the Channel F's built-in games). For the TI-83,
@@ -55,7 +57,7 @@ Each machine has its own controls, named after MAME's: `P1 Up`,
 `P1 Button 1`, and the driver's own names where it has them (`P1 Push Down`
 on the Channel F, `P1 Upper` and the keypad's `P1 1` to `P1 Enter` on the
 Intellivision, `Reset`, `Select` and `Pause` on the 7800, every key of a
-CPC's keyboard). Where one machine has two of the same controller (the
+CPC's or a BBC Micro's keyboard). Where one machine has two of the same controller (the
 Intellivision's hand controllers), the left one is P1.
 
 An analog control (the Vectrex's sticks, the Intellivision's disc in analog
@@ -69,14 +71,16 @@ controls.
 ## Disks
 
 A machine with a disk drive (the CPC664, the CPC6128 and its models, the
-CPC+) has three controls of the core's own after its keyboard: Next Disk and
+CPC+, the BBC Micro) has three controls of the core's own after its keyboard: Next Disk and
 Previous Disk put the next or the previous disk of the project's list into
 drive A (round the end of the list), and Eject Disk leaves the drive empty.
 It starts with the first disk in. What a program writes to a disk stays with
 that disk when it comes out and goes back, and is part of a savestate; the
 project's own files are never written. Export Save Data hands out each disk
 the machine wrote to, under its own name, as an Extended DSK file; a new
-project that takes it as its game starts with the disk as it was left.
+project that takes it as its game starts with the disk as it was left. A
+BBC Micro's disc (`.ssd`, `.dsd`) the machine wrote to is not handed out:
+it is another format, which the core does not write yet.
 
 ## Settings
 
@@ -97,6 +101,9 @@ the machine: a movie needs the same values.
 
 - Only the GX4000 is tested on CI; the others are tested where their
   firmware is.
+- The BBC Micro has not been run with its ROMs: the machines build and their
+  controls, discs, tapes and firmware are declared, but no BBC Micro game has
+  been tried.
 
 ## Using it in Chimera
 

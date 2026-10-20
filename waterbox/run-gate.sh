@@ -288,7 +288,7 @@ machine_tests() { # <label> <folder> <frames>
 machine_tests gx4000 "$work/gx" 600
 
 # ------------------------------------ 3. machines that need firmware
-for m in intv:3000 channelf:1500 vectrex:1500 a7800:1500 odyssey2:1500 cpc:3000 ti83:1500; do
+for m in intv:3000 channelf:1500 vectrex:1500 a7800:1500 odyssey2:1500 cpc:3000 ti83:1500 bbc:3000; do
 	name="${m%%:*}"; frames="${m#*:}"
 	if [ ! -f "$roms/$name/settings" ]; then
 		report SKIP "$name: its tests" "no folder $roms/$name"

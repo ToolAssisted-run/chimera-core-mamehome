@@ -8,3 +8,6 @@ philips/odyssey2.cpp
 fairchild/channelf.cpp
 amstrad/amstrad.cpp
 ti/ti85.cpp
+acorn/bbcb.cpp
+acorn/bbcbp.cpp
+acorn/bbcm.cpp

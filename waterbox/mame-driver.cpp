@@ -25,6 +25,7 @@
 
 #include "emu.h"
 #include "emuopts.h"
+#include "corestr.h"
 #include "input.h"
 #include "inputdev.h"
 #include "frontend/mame/ui/menuitem.h"
@@ -1574,12 +1575,17 @@ extern "C" int mame_save_count(void)
 	}
 	// and every disk the machine wrote to, in a drive or taken out, by the name
 	// of its file, as an Extended DSK file (patch 0012): taken back as a game
-	// file of a new project, it is the disk as the machine left it
+	// file of a new project, it is the disk as the machine left it. Only a
+	// .dsk file: the encoder reads double-density tracks and writes the CPC's
+	// format, so a BBC Micro's single-density .ssd or .dsd would leave as
+	// something that is not its own format; such a disk is not handed out.
 	for (auto &disk : chimera_written_disks(s_machine->root_device()))
 	{
 		save_file f;
 		f.name = disk.first;
 		if (auto const slash = f.name.find_last_of("/\\"); slash != std::string::npos) f.name.erase(0, slash + 1);
+		if (f.name.size() < 4 || core_stricmp(f.name.substr(f.name.size() - 4), ".dsk") != 0)
+			continue;
 		f.bytes = std::move(disk.second);
 		s_saves_out.push_back(std::move(f));
 	}
