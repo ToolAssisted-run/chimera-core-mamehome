@@ -172,10 +172,10 @@ def axis_header(name):
 
 # ---- default key bindings ----------------------------------------------------
 PAD = {
-    "Up": "Up, J{n} POV1U, X{n} DpadUp, X{n} LStickUp",
-    "Down": "Down, J{n} POV1D, X{n} DpadDown, X{n} LStickDown",
-    "Left": "Left, J{n} POV1L, X{n} DpadLeft, X{n} LStickLeft",
-    "Right": "Right, J{n} POV1R, X{n} DpadRight, X{n} LStickRight",
+    "Up": "Up, J{n} POV0U, X{n} DpadUp, X{n} LStickUp",
+    "Down": "Down, J{n} POV0D, X{n} DpadDown, X{n} LStickDown",
+    "Left": "Left, J{n} POV0L, X{n} DpadLeft, X{n} LStickLeft",
+    "Right": "Right, J{n} POV0R, X{n} DpadRight, X{n} LStickRight",
     "Button 1": "Z, J{n} B1, X{n} A", "Button 2": "X, J{n} B2, X{n} B",
     "Button 3": "C, J{n} B3, X{n} X", "Button 4": "V, J{n} B4, X{n} Y",
     "Upper": "Z, J{n} B1, X{n} A", "Lower-Left": "X, J{n} B2, X{n} B", "Lower-Right": "C, J{n} B3, X{n} X",
@@ -184,9 +184,14 @@ PAD = {
 }
 KEYPAD = {str(d): "Keypad%d" % d for d in range(10)}
 KEYPAD.update({"Clear": "KeypadDecimal", "Enter": "KeypadEnter"})
-CONSOLE = {"Reset": "F1", "Select": "F2", "Pause": "F3",
-           "TIME (Button 1)": "Number1", "HOLD (Button 2)": "Number2", "MODE (Button 3)": "Number3",
-           "START (Button 4)": "Number4",
+# A console's own buttons are on the keyboard and on the first game controller
+# (chimera#336): Reset starts a game, so it is on Start, Select on Back; the
+# Atari 7800's Pause on the right shoulder, and a console with Pause but no
+# Reset (the GX4000) has Pause on Start. The Channel F's four buttons are on
+# X, Y, Back and Start (its controller's twist has the shoulders).
+CONSOLE = {"Reset": "F1, J1 B10, X1 Start", "Select": "F2, J1 B9, X1 Back", "Pause": "F3, J1 B6, X1 RightShoulder",
+           "TIME (Button 1)": "Number1, J1 B5, X1 X", "HOLD (Button 2)": "Number2, J1 B6, X1 Y",
+           "MODE (Button 3)": "Number3, J1 B9, X1 Back", "START (Button 4)": "Number4, J1 B10, X1 Start",
            "Previous Disk": "PageUp", "Next Disk": "PageDown", "Eject Disk": "Insert"}
 # a computer's key, by its name, to the PC key in the same place
 KEYS = {"Space": "Space", "Return": "Enter", "Enter": "Enter", "Shift": "Shift, LeftShift", "Control": "Ctrl",
@@ -214,6 +219,8 @@ def binding(name, keyboard, names=()):
         if n == 1 and b in KEYPAD:
             return KEYPAD[b]
         return ""
+    if b == "Pause" and "Reset" not in names:
+        return "F3, J1 B10, X1 Start"
     if b in CONSOLE:
         return CONSOLE[b]
     if keyboard:
