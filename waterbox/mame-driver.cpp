@@ -55,6 +55,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <functional>
 #include <map>
 #include <set>
 #include <sstream>
@@ -278,7 +279,7 @@ analog_shape shape_of(ioport_field const &field)
 // machine's description (the walk). Buttons and axes, each in order.
 void controls_of(ioport_list const &ports, std::vector<control> &buttons, std::vector<control> &axes)
 {
-	struct found { ioport_field *field; std::string device, base; int player, group, order; };
+	struct found { ioport_field *field; std::string device, base, port; int player, group, order; bool named = false; };
 	std::vector<found> fields;
 	int sequence = 0;
 	for (auto &port : ports)
@@ -292,6 +293,7 @@ void controls_of(ioport_list const &ports, std::vector<control> &buttons, std::v
 			found f;
 			f.field = &field;
 			f.device = port.second->device().tag();
+			f.port = port.first;
 			if (is_nameless(type))
 			{
 				std::string name;
@@ -335,45 +337,12 @@ void controls_of(ioport_list const &ports, std::vector<control> &buttons, std::v
 					f.base.erase(f.base.size() - tail.size());
 				f.group = 0;
 				f.order = at;
+				f.named = field.specific_name() != nullptr;
 			}
 			fields.push_back(std::move(f));
 		}
 	}
 	auto const name_of = [] (found const &f) { return f.player ? "P" + std::to_string(f.player) + " " + f.base : f.base; };
-
-	// A keyboard's keys in the order they sit on it, row by row, where the
-	// keys are those of a keyboard below (chimera#310): MAME lists them in
-	// the order its matrix is scanned, and a person looking for a key in the
-	// controller window or TAStudio looks along the rows. Chosen by the keys
-	// themselves, not by machine: the layout whose keys this keyboard has.
-	// Keys a layout does not name keep MAME's order after it.
-	static std::vector<std::vector<std::string>> const layouts = {
-		{	// Amstrad CPC: the main block, then the keypad (f0-f9) at the end of its row
-			"Esc", "1 !", "2 \" ~", "3 #", "4 $", "5 %", "6 &", "7 '", "8 (", "9 )", "0 _", "- =", "Up Arrow Pound", "Clr", "Del", "Keypad 7", "Keypad 8", "Keypad 9",
-			"Tab", "Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "@ Broken Bar", "[", "Enter", "Keypad 4", "Keypad 5", "Keypad 6",
-			"Caps Lock", "A", "S", "D", "F", "G", "H", "J", "K", "L", ": *", "; +", "]", "Keypad 1", "Keypad 2", "Keypad 3",
-			"Shift", "Z", "X", "C", "V", "B", "N", "M", ", <", ". >", "/ Question", "\\", "Keypad 0", "Cursor Up", "Keypad .",
-			"Ctrl", "Copy", "Space", "Keypad Enter", "Cursor Left", "Cursor Down", "Cursor Right",
-		},
-	};
-	{
-		std::set<std::string> keys;
-		for (found const &f : fields)
-			if (f.group == 1) keys.insert(f.base);
-		for (auto const &layout : layouts)
-		{
-			int named = 0;
-			for (std::string const &k : layout) named += keys.count(k) ? 1 : 0;
-			if (keys.empty() || named * 10 < int(keys.size()) * 9) continue;   // most of this keyboard, or not it
-			for (found &f : fields)
-			{
-				if (f.group != 1) continue;
-				auto const at = std::find(layout.begin(), layout.end(), f.base);
-				f.order = at != layout.end() ? int(at - layout.begin()) : int(layout.size()) + f.order;
-			}
-			break;
-		}
-	}
 
 	// one name from two devices: those devices' controls take a player each
 	std::map<std::string, std::set<std::string>> devices_of;
@@ -392,10 +361,161 @@ void controls_of(ioport_list const &ports, std::vector<control> &buttons, std::v
 		// a kind's place follows the player's: P2's Up after P2's
 		if (f.group == 0) f.order = type_index(f.field->type(), 0) >= 0 ? type_index(f.field->type(), 0) : f.order;
 	}
-	std::stable_sort(fields.begin(), fields.end(), [] (found const &a, found const &b) {
+	// A keyboard's keys in the order they sit on it, row by row (chimera#310,
+	// chimera#337): MAME lists them in the order its matrix is scanned, and a
+	// person looking for a key in the controller window or TAStudio looks
+	// along the rows. Keys a layout does not place keep MAME's order after it.
+	//
+	// The Amstrads' keys by their place in the matrix, which every model has
+	// the same - the French, Swedish and Spanish ones differ only in what is
+	// printed on the keys: the main block, then the keypad (f0-f9) at the end
+	// of its row, as on the machine.
+	static std::vector<std::pair<std::string, ioport_value>> const amstrad = {
+		{ "kbrow.8", 0x04 }, { "kbrow.8", 0x01 }, { "kbrow.8", 0x02 }, { "kbrow.7", 0x02 }, { "kbrow.7", 0x01 }, { "kbrow.6", 0x02 },
+		{ "kbrow.6", 0x01 }, { "kbrow.5", 0x02 }, { "kbrow.5", 0x01 }, { "kbrow.4", 0x02 }, { "kbrow.4", 0x01 }, { "kbrow.3", 0x02 },
+		{ "kbrow.3", 0x01 }, { "kbrow.2", 0x01 }, { "kbrow.9", 0x80 }, { "kbrow.1", 0x04 }, { "kbrow.1", 0x08 }, { "kbrow.0", 0x08 },
+		{ "kbrow.8", 0x10 }, { "kbrow.8", 0x08 }, { "kbrow.7", 0x08 }, { "kbrow.7", 0x04 }, { "kbrow.6", 0x04 }, { "kbrow.6", 0x08 },
+		{ "kbrow.5", 0x08 }, { "kbrow.5", 0x04 }, { "kbrow.4", 0x08 }, { "kbrow.4", 0x04 }, { "kbrow.3", 0x08 }, { "kbrow.3", 0x04 },
+		{ "kbrow.2", 0x02 }, { "kbrow.2", 0x04 }, { "kbrow.2", 0x10 }, { "kbrow.1", 0x10 }, { "kbrow.0", 0x10 },
+		{ "kbrow.8", 0x40 }, { "kbrow.8", 0x20 }, { "kbrow.7", 0x10 }, { "kbrow.7", 0x20 }, { "kbrow.6", 0x20 }, { "kbrow.6", 0x10 },
+		{ "kbrow.5", 0x10 }, { "kbrow.5", 0x20 }, { "kbrow.4", 0x20 }, { "kbrow.4", 0x10 }, { "kbrow.3", 0x20 }, { "kbrow.3", 0x10 },
+		{ "kbrow.2", 0x08 }, { "kbrow.1", 0x20 }, { "kbrow.1", 0x40 }, { "kbrow.0", 0x20 },
+		{ "kbrow.2", 0x20 }, { "kbrow.8", 0x80 }, { "kbrow.7", 0x80 }, { "kbrow.7", 0x40 }, { "kbrow.6", 0x80 }, { "kbrow.6", 0x40 },
+		{ "kbrow.5", 0x40 }, { "kbrow.4", 0x40 }, { "kbrow.4", 0x80 }, { "kbrow.3", 0x80 }, { "kbrow.3", 0x40 }, { "kbrow.2", 0x40 },
+		{ "kbrow.1", 0x80 }, { "kbrow.0", 0x01 }, { "kbrow.0", 0x80 },
+		{ "kbrow.2", 0x80 }, { "kbrow.1", 0x02 }, { "kbrow.5", 0x80 }, { "kbrow.0", 0x40 }, { "kbrow.1", 0x01 }, { "kbrow.0", 0x04 },
+		{ "kbrow.0", 0x02 },
+	};
+	// Keyboards placed by their keys' names: the BBC Micro's (its red function
+	// keys and BREAK on top; the Master's keypad after the main block), and the
+	// TI-83's keys, a calculator's, from the top.
+	static std::vector<std::vector<std::string>> const layouts = {
+		{
+			"F0", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "BREAK",
+			"ESCAPE", "1 !", "2 \"", "3 #", "4 $", "5 %", "6 &", "7 '", "8 (", "9 )", "0", "- =", "^ ~", "\\ |",
+			"Cursor Left", "Cursor Right",
+			"TAB", "Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "@", "[ {", "_ Pound", "Cursor Up", "Cursor Down",
+			"CAPSLOCK", "CTRL", "A", "S", "D", "F", "G", "H", "J", "K", "L", "; +", ": *", "] }", "RETURN",
+			"SHIFTLOCK", "SHIFT", "Z", "X", "C", "V", "B", "N", "M", ", <", ". >", "/ Question", "DELETE", "COPY",
+			"SPACE",
+			"Keypad +", "Keypad -", "Keypad /", "Keypad *", "Keypad 7", "Keypad 8", "Keypad 9", "Keypad #",
+			"Keypad 4", "Keypad 5", "Keypad 6", "Keypad DELETE", "Keypad 1", "Keypad 2", "Keypad 3", "Keypad ,",
+			"Keypad 0", "Keypad .", "Keypad RETURN",
+		},
+		{
+			"Y=", "WINDOW", "ZOOM", "TRACE", "GRAPH",
+			"2nd", "MODE", "DEL", "Left", "Up", "Right", "Down",
+			"ALPHA", "x-VAR", "STAT",
+			"MATH", "MATRX", "PRGM", "VARS", "CLEAR",
+			"x^-1", "SIN", "COS", "TAN", "^",
+			"x^2", ",", "(", ")", "/",
+			"LOG", "7", "8", "9", "*",
+			"LN", "4", "5", "6", "-",
+			"STORE", "1", "2", "3", "+",
+			"ON/OFF", "0", ".", "(-)", "ENTER",
+		},
+	};
+	// Any other keyboard: by the PC key MAME gives each of its keys, along the
+	// PC keyboard's rows, then the keys beside them, the arrows and the keypad.
+	static std::vector<input_item_id> const pc = {
+		ITEM_ID_ESC, ITEM_ID_F1, ITEM_ID_F2, ITEM_ID_F3, ITEM_ID_F4, ITEM_ID_F5, ITEM_ID_F6, ITEM_ID_F7, ITEM_ID_F8,
+		ITEM_ID_F9, ITEM_ID_F10, ITEM_ID_F11, ITEM_ID_F12, ITEM_ID_PRTSCR, ITEM_ID_SCRLOCK, ITEM_ID_PAUSE,
+		ITEM_ID_TILDE, ITEM_ID_1, ITEM_ID_2, ITEM_ID_3, ITEM_ID_4, ITEM_ID_5, ITEM_ID_6, ITEM_ID_7, ITEM_ID_8,
+		ITEM_ID_9, ITEM_ID_0, ITEM_ID_MINUS, ITEM_ID_EQUALS, ITEM_ID_BACKSPACE,
+		ITEM_ID_TAB, ITEM_ID_Q, ITEM_ID_W, ITEM_ID_E, ITEM_ID_R, ITEM_ID_T, ITEM_ID_Y, ITEM_ID_U, ITEM_ID_I,
+		ITEM_ID_O, ITEM_ID_P, ITEM_ID_OPENBRACE, ITEM_ID_CLOSEBRACE, ITEM_ID_BACKSLASH,
+		ITEM_ID_CAPSLOCK, ITEM_ID_A, ITEM_ID_S, ITEM_ID_D, ITEM_ID_F, ITEM_ID_G, ITEM_ID_H, ITEM_ID_J, ITEM_ID_K,
+		ITEM_ID_L, ITEM_ID_COLON, ITEM_ID_QUOTE, ITEM_ID_ENTER,
+		ITEM_ID_LSHIFT, ITEM_ID_BACKSLASH2, ITEM_ID_Z, ITEM_ID_X, ITEM_ID_C, ITEM_ID_V, ITEM_ID_B, ITEM_ID_N,
+		ITEM_ID_M, ITEM_ID_COMMA, ITEM_ID_STOP, ITEM_ID_SLASH, ITEM_ID_RSHIFT,
+		ITEM_ID_LCONTROL, ITEM_ID_LWIN, ITEM_ID_LALT, ITEM_ID_SPACE, ITEM_ID_RALT, ITEM_ID_RWIN, ITEM_ID_MENU,
+		ITEM_ID_RCONTROL,
+		ITEM_ID_INSERT, ITEM_ID_HOME, ITEM_ID_PGUP, ITEM_ID_DEL, ITEM_ID_END, ITEM_ID_PGDN,
+		ITEM_ID_UP, ITEM_ID_LEFT, ITEM_ID_DOWN, ITEM_ID_RIGHT,
+		ITEM_ID_NUMLOCK, ITEM_ID_SLASH_PAD, ITEM_ID_ASTERISK, ITEM_ID_MINUS_PAD, ITEM_ID_7_PAD, ITEM_ID_8_PAD,
+		ITEM_ID_9_PAD, ITEM_ID_PLUS_PAD, ITEM_ID_4_PAD, ITEM_ID_5_PAD, ITEM_ID_6_PAD, ITEM_ID_1_PAD, ITEM_ID_2_PAD,
+		ITEM_ID_3_PAD, ITEM_ID_ENTER_PAD, ITEM_ID_0_PAD, ITEM_ID_DEL_PAD,
+	};
+	{
+		auto const ends_with = [] (std::string const &s, std::string const &tail) {
+			return s.size() >= tail.size() && s.compare(s.size() - tail.size(), tail.size(), tail) == 0;
+		};
+		std::function<int (found const &)> const amstrad_at = [&ends_with] (found const &f) {
+			for (size_t i = 0; i < amstrad.size(); i++)
+				if (f.field->mask() == amstrad[i].second && ends_with(f.port, ":" + amstrad[i].first)) return int(i);
+			return -1;
+		};
+		std::function<int (found const &)> const pc_at = [] (found const &f) {
+			// the field's own code: the type's default needs a running machine
+			input_code const code = f.field->defseq_unresolved(SEQ_TYPE_STANDARD)[0];
+			if (code.device_class() != DEVICE_CLASS_KEYBOARD) return -1;
+			auto const at = std::find(pc.begin(), pc.end(), code.item_id());
+			return at != pc.end() ? int(at - pc.begin()) : -1;
+		};
+		std::set<std::string> keys;
+		int count = 0, on_amstrad = 0;
+		for (found const &f : fields)
+			if (f.group == 1 && !f.player)
+			{
+				keys.insert(f.base);
+				count++;
+				on_amstrad += amstrad_at(f) >= 0 ? 1 : 0;
+			}
+		std::function<int (found const &)> place;
+		int size = 0;
+		if (count && on_amstrad * 10 >= count * 9)
+		{
+			place = amstrad_at;
+			size = int(amstrad.size());
+		}
+		for (auto const &layout : layouts)
+		{
+			if (place) break;
+			int named = 0;
+			for (std::string const &k : layout) named += keys.count(k) ? 1 : 0;
+			if (keys.empty() || named * 10 < int(keys.size()) * 9) continue;   // most of this keyboard, or not it
+			place = [&layout] (found const &f) {
+				auto const at = std::find(layout.begin(), layout.end(), f.base);
+				return at != layout.end() ? int(at - layout.begin()) : -1;
+			};
+			size = int(layout.size());
+		}
+		if (!place)
+		{
+			place = pc_at;
+			size = int(pc.size());
+		}
+		for (found &f : fields)
+		{
+			if (f.group != 1 || f.player) continue;   // a controller's keypad keeps MAME's order
+			int const at = place(f);
+			f.order = at >= 0 ? at : size + f.order;
+		}
+	}
+
+	// A player with two controls of one kind has two controllers: the Amstrad's
+	// joystick, and the Cheetah 125 beside it, which MAME names "Cheetah 125
+	// Up". The controller MAME leaves unnamed comes first and the named ones
+	// after it, a port at a time, rather than the two interleaved by kind
+	// (chimera#337).
+	std::set<int> two_of_a_kind;
+	{
+		std::set<std::pair<int, int>> kinds;
+		for (found const &f : fields)
+			if (f.group == 0 && !kinds.insert({ f.player, type_index(f.field->type(), 0) }).second)
+				two_of_a_kind.insert(f.player);
+	}
+	std::map<std::string, int> port_rank;
+	for (found const &f : fields) port_rank.emplace(f.port, int(port_rank.size()));
+	std::stable_sort(fields.begin(), fields.end(), [&two_of_a_kind, &port_rank] (found const &a, found const &b) {
 		int const pa = a.player ? a.player : 1 << 20, pb = b.player ? b.player : 1 << 20;
 		if (pa != pb) return pa < pb;
 		if (a.group != b.group) return a.group < b.group;
+		if (a.group == 0 && two_of_a_kind.count(a.player))
+		{
+			if (a.named != b.named) return !a.named;
+			if (a.named && a.port != b.port) return port_rank.at(a.port) < port_rank.at(b.port);
+		}
 		return a.order < b.order;
 	});
 

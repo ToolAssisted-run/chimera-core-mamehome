@@ -244,3 +244,37 @@ character ROM, under MAME's names) come from the walk, as for every machine.
 
 - Chimera's window on Windows not tried (only its headless runner).
 - The BBC Micro not run with its ROMs.
+
+## 2026-10-21: every keyboard in rows, and two controllers kept apart (chimera#337)
+
+Only the CPC 464's keyboard was in rows (chimera#310): its layout was by
+key name, and the other CPC models, whose keys MAME names differently (the
+6128's "Return", "Control", "f7"; the French AZERTY model's accented keys),
+fell back to the order MAME scans the matrix in. So did the BBC Micro, the
+Odyssey 2 and Videopac, the Intellivision ECS keyboard and the TI-83.
+
+`controls_of` in `waterbox/mame-driver.cpp` now orders a keyboard (the keys
+with no player) by:
+
+- the Amstrads' matrix: a key's port (`kbrow.0` to `kbrow.9`) and bit, the
+  same on every model, laid out as #310 laid out the 464 (the keypad at the
+  end of each row). The French, Swedish and Spanish models follow it, and
+  the 464 is unchanged;
+- a layout by name: the BBC Micro's (its red function keys and BREAK on top,
+  the Master's keypad after the main block) and the TI-83's (its keys from
+  the top);
+- otherwise the PC key MAME gives each key (its default code), along a PC
+  keyboard's rows: the Odyssey 2 and Videopac, the ECS.
+
+A controller's keypad (the Intellivision's, a player's) keeps MAME's order.
+And when one player has two controls of one kind (the Amstrad's joystick and
+the Cheetah 125 beside it, both "Up"), the controller MAME leaves unnamed
+comes first and the named one after it, rather than the two interleaved.
+
+Measured: a walk of the 102 machines of the build gives the same buttons as
+before for every machine, in a new order for 83 (the keyboards, the CPC
+464's two controllers); the package was regenerated from it and binds no
+controller button twice. The gate: 77 passed, 1 skipped (the BBC's own
+tests, no local folder), 1 failed only because its contract step found the
+system's dotnet; the contract tests run with Chimera's pass, 23 of 23. The
+frontend tests pass, 4 of 4.
