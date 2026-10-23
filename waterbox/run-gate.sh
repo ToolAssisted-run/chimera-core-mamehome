@@ -476,6 +476,11 @@ if [ -f "$roms/intv/settings" ]; then
 	"$wbxrun" "$core" "$work/intv-nogrom" --frames 1 > "$work/intv-nogrom.run" 2>&1 || true
 	check "intv: a missing firmware file is named, and nothing runs" "$(grep -o 'ro-3-9503-003.u21 - [a-z]*' "$work/intv-nogrom.run" | head -1)" \
 		grep -q "Init failed.*ro-3-9503-003.u21 - missing" "$work/intv-nogrom.run"
+	# what the New Project window is told before its Firmware page: the files the machine reads,
+	# none of them said to be missing, as the window has handed the core no firmware yet (chimera#364)
+	"$wbxrun" "$core" "$work/intv-nogrom" --suggest > "$work/intv-nogrom.suggest" 2>&1 || true
+	check "intv: the wizard's note names the firmware and calls none missing" "$(grep -o 'It reads [^.]*' "$work/intv-nogrom.suggest" | head -1)" \
+		sh -c "grep -q 'The Firmware page asks for them' '$work/intv-nogrom.suggest' && ! grep -q 'missing' '$work/intv-nogrom.suggest'"
 	copy_folder "$roms/intv" intv-analog '{"machine":"intv","config.Controller Disc Emulation":"Analog"}'
 	"$wbxrun" "$core" "$work/intv-analog" --frames 1 --list-panel > "$work/intv-analog.panel" 2> /dev/null || true
 	check "intv: the disc is buttons or axes, as its switch says" "" \

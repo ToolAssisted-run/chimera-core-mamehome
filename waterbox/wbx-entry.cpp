@@ -95,7 +95,7 @@ ECL_EXPORT const char *SuggestSettings(void)
 	std::string why;
 	if (!Describe(why))
 		return g_suggestion.assign("{\"values\":{},\"note\":" + JsonString(why) + "}").c_str();
-	return g_suggestion.assign("{\"values\":{},\"note\":" + JsonString(mame_report()) + "}").c_str();
+	return g_suggestion.assign("{\"values\":{},\"note\":" + JsonString(mame_report_for_wizard()) + "}").c_str();
 }
 
 ECL_EXPORT int Init(void)

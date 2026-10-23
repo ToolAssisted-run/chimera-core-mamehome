@@ -278,3 +278,19 @@ controller button twice. The gate: 77 passed, 1 skipped (the BBC's own
 tests, no local folder), 1 failed only because its contract step found the
 system's dotnet; the contract tests run with Chimera's pass, 23 of 23. The
 frontend tests pass, 4 of 4.
+
+## The New Project window's note calls no firmware missing (2026-10-24)
+
+The New Project window asks the core about a game before its Firmware page,
+and gives it no firmware then. The note said every firmware file the machine
+reads was "missing or wrong", and the next page found them all
+(chimera#364: an Amstrad CPC664's cpc664.rom and cpcados.rom). The note for
+the window now names the files the machine reads and says the Firmware page
+asks for them; a file that is there but wrong is still said. What the core
+says when a project's machine is built (Init) is unchanged: a missing file
+there is missing. The arcade core already did this (mame_report_for_wizard).
+
+Tested: the gate's new check "intv: the wizard's note names the firmware and
+calls none missing" (an Intellivision folder without its GROM, asked as the
+window asks) fails with the old note and passes with the new; the gate: 79
+passed, 0 failed, 1 skipped (the BBC's own tests, no local folder).

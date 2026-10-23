@@ -32,6 +32,9 @@ int mame_describe(void);
 // "config.<name>") and a way to give one a value before mame_init (0 when the
 // machine has that setting and that value).
 const char *mame_report(void);
+// The same for the New Project window, which has given the core no firmware
+// yet: a missing file is not said to be, as its Firmware page asks for them.
+const char *mame_report_for_wizard(void);
 int mame_problem_count(void);
 int mame_game_setting_count(void);
 const char *mame_game_setting_key(int index);

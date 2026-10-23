@@ -1279,8 +1279,12 @@ extern "C" int mame_describe(void)
 }
 
 // The description in words: the machine, what MAME says of it, the firmware
-// files it reads, and every one of them that is missing or wrong.
-extern "C" const char *mame_report(void)
+// files it reads, and every one of them that is missing or wrong. For the New
+// Project window (wizard) a file that is missing is not said to be: the
+// window asks for the firmware on its next page and has given the core none
+// yet, so every file would be missing there (chimera#364). A file that is
+// there but wrong is still said.
+static const char *report(bool wizard)
 {
 	static std::string out;
 	if (!s_desc.error.empty()) return (out = s_desc.error).c_str();
@@ -1294,12 +1298,13 @@ extern "C" const char *mame_report(void)
 		if (!f.required) continue;
 		required++;
 		names += (names.empty() ? "" : ", ") + f.name;
-		if (!f.problem.empty()) problems.push_back(&f);
+		if (!f.problem.empty() && !(wizard && f.problem == "missing")) problems.push_back(&f);
 	}
 	if (!required)
 		out += " This machine needs no firmware.";
 	else
 		out += " It reads " + std::to_string(required) + " firmware file" + (required == 1 ? "" : "s") + ": " + names + ".";
+	if (wizard && required) out += " The Firmware page asks for " + std::string(required == 1 ? "it" : "them") + ".";
 	if (!problems.empty())
 	{
 		out += " " + std::to_string(problems.size()) + (problems.size() == 1 ? " is" : " are") + " missing or wrong:";
@@ -1309,6 +1314,9 @@ extern "C" const char *mame_report(void)
 	}
 	return out.c_str();
 }
+
+extern "C" const char *mame_report(void) { return report(false); }
+extern "C" const char *mame_report_for_wizard(void) { return report(true); }
 
 extern "C" int mame_problem_count(void)
 {
