@@ -146,7 +146,7 @@ else
 fi
 # every key the default bindings name is one Chimera sends (a binding to a
 # name it never sends never fires)
-if [ -d "$chimera_root/source/gui" ]; then
+if [ -f "$chimera_root/source/ui/qt/key_codes.inc" ]; then
 	if python3 "$root/tests/check-key-names.py" "$chimera_root" "$here/default_keybinds.json" > "$work/keynames.log" 2>&1; then
 		report PASS "the default key bindings name keys Chimera sends" "$(tail -1 "$work/keynames.log")"
 	else
