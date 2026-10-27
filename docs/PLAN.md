@@ -276,7 +276,7 @@ before for every machine, in a new order for 83 (the keyboards, the CPC
 464's two controllers); the package was regenerated from it and binds no
 controller button twice. The gate: 77 passed, 1 skipped (the BBC's own
 tests, no local folder), 1 failed only because its contract step found the
-system's dotnet; the contract tests run with Chimera's pass, 23 of 23. The
+system's test runner; the contract tests run with Chimera's pass, 23 of 23. The
 frontend tests pass, 4 of 4.
 
 ## The New Project window's note calls no firmware missing (2026-10-24)
