@@ -522,16 +522,15 @@ if [ -x "$run" ] && [ -f "$pkg" ]; then
 else
 	report SKIP "gx4000: a project's movie reaches the machine in Chimera's engine" "no chimera-run at $run, or no package"
 fi
-tests="$chimera_root/source/gui/Chimera.Tests.Client.Common/Chimera.Tests.Client.Common.csproj"
-if [ -f "$tests" ] && command -v dotnet > /dev/null 2>&1 && [ -f "$pkg" ]; then
-	if CHIMERA_CORES_DIR="$(dirname "$pkg")" env -u DISPLAY dotnet test "$tests" -c Release --no-build \
-		--filter "FullyQualifiedName~InstalledCorePackagesTests|FullyQualifiedName~MnemonicUniquenessTests" > "$work/contract.log" 2>&1; then
-		report PASS "Chimera's package checks" "$(grep -o 'Passed: *[0-9]*' "$work/contract.log" | tail -1)"
+tests="$chimera_root/build/meson-linux/source/ui/test-packages"
+if [ -x "$tests" ] && [ -f "$pkg" ]; then
+	if CHIMERA_CORES_DIR="$(dirname "$pkg")" env -u DISPLAY "$tests" > "$work/contract.log" 2>&1; then
+		report PASS "Chimera's package checks" "$(tail -1 "$work/contract.log")"
 	else
 		report FAIL "Chimera's package checks" "see $work/contract.log"
 	fi
 else
-	report SKIP "Chimera's package checks" "no dotnet, or no chimera tests at $tests"
+	report SKIP "Chimera's package checks" "no test-packages program at $tests, or no package"
 fi
 
 finish
