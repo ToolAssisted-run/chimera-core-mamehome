@@ -25,6 +25,35 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
+# ---- the texts a person reads ------------------------------------------------
+# Every one is a key of languages/en.json (chimera docs/translations.md):
+# text() records the key's English and returns the key, each of its arguments
+# after it behind a 0x1F; inner() is the same for a text that is itself an
+# argument, whose own arguments follow a 0x1E. write_texts() puts them in the
+# table, beside the keys the core's code names.
+TEXTS = {}
+
+
+def text(key, english, *args):
+    if TEXTS.setdefault(key, english) != english:
+        sys.exit("%s has two texts: %r and %r" % (key, TEXTS[key], english))
+    return "\x1f".join([key] + [str(a) for a in args])
+
+
+def inner(key, english, *args):
+    return "\x1e".join([text(key, english)] + [str(a) for a in args])
+
+
+def write_texts(path):
+    table = json.load(open(path, encoding="utf-8")) if os.path.exists(path) else {"texts": {}}
+    table["texts"].update(TEXTS)
+    table["texts"] = dict(sorted(table["texts"].items()))
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(table, f, indent="\t", ensure_ascii=False)
+        f.write("\n")
+
+
 # ---- the machines ------------------------------------------------------------
 def read_machines(path):
     out = []
@@ -289,14 +318,17 @@ def firmware_entries(chosen, walk):
         when = parts[0] if len(parts) == 1 else {"any": parts}
         titles = list(dict.fromkeys(walk[machine]["title"] for machine, _ in entry["uses"]))
         owner = f["set"]
-        what = ("a ROM of the " + walk[owner]["title"]) if owner in walk else ("the ROM of a chip inside it (MAME's device " + owner + ")")
+        what = inner("firmware.what.rom_of", "A ROM of the %1", walk[owner]["title"]) if owner in walk else \
+            inner("firmware.what.chip_rom", "The ROM of a chip inside it (MAME's device %1)", owner)
         size = f["size"]
-        size_text = ("%d KB" % (size // 1024)) if size >= 1024 and size % 1024 == 0 else ("%d bytes" % size)
+        size_text = inner("firmware.size.kb", "%1 KB", size // 1024) if size >= 1024 and size % 1024 == 0 else \
+            inner("firmware.size.bytes", "%1 bytes", size)
         out.append({
             "id": fname if ids[fname] == 1 else fname + "@" + owner,
-            "display": "%s: %s" % (titles[0] if len(titles) == 1 else walk[entry["uses"][0][0]]["title"].split(" (")[0], fname),
-            "description": "%s (%s), which MAME names %s. Used by: %s. It is part of the machine, so you supply it, and the core checks it is the right one." % (
-                what[0].upper() + what[1:], size_text, fname, ", ".join(titles)),
+            "display": text("firmware.display", "%1: %2",
+                            titles[0] if len(titles) == 1 else walk[entry["uses"][0][0]]["title"].split(" (")[0], fname),
+            "description": text("firmware.about", "%1 (%2), which MAME names %3. Used by: %4. It is part of the machine, so you "
+                                "supply it, and the core checks it is the right one.", what, size_text, fname, ", ".join(titles)),
             "size": size,
             "sha1": sha1,
             "name": fname,
@@ -357,12 +389,12 @@ def main():
         systems_text.append("%s: %s" % (labels[system], ", ".join("%s (%s)" % (n, walk[n]["title"]) for n in names)))
     settings = [{
         "name": "machine",
-        "display": "Machine",
+        "display": text("setting.machine", "Machine"),
         "type": "enum",
         "options": [n for n, _, _ in chosen],
         "default": chosen[0][0],
-        "description": "Which machine this project is, by MAME's name for it. The choice is saved in the project and recorded in the movie. "
-                       + "; ".join(systems_text) + ".",
+        "description": text("setting.machine.about", "Which machine this project is, by MAME's name for it. The choice is "
+                            "saved in the project and recorded in the movie. %1.", "; ".join(systems_text)),
     }]
     decls = collections.OrderedDict()
     for name, _, _ in chosen:
@@ -371,15 +403,20 @@ def main():
             opts = [b["description"] for b in m["bios"]]
             default = next(b["description"] for b in m["bios"] if b["default"])
             decls.setdefault(("bios", tuple(opts), default), {
-                "name": "bios", "display": "BIOS", "type": "enum", "options": opts, "default": default,
-                "description": "Which of the machine's BIOS versions it starts with. The default is MAME's. A movie needs the same one to play back.",
+                "name": "bios", "display": text("setting.bios", "BIOS"), "type": "enum", "options": opts, "default": default,
+                "description": text("setting.bios.about", "Which of the machine's BIOS versions it starts with. The default "
+                                    "is MAME's. A movie needs the same one to play back."),
                 "when": []})["when"].append(name)
         for sw in m["switches"]:
             sname = sw["kind"] + "." + sw["name"]
-            what = "A switch on the console" if sw["kind"] == "dip" else "A part of the machine's set-up"
+            # the switch's name is MAME's, shown as it is
+            what = text("setting.switch.dip", "A switch on the console") if sw["kind"] == "dip" else \
+                text("setting.switch.config", "A part of the machine's set-up")
             decls.setdefault((sname, tuple(sw["options"]), sw["default"]), {
-                "name": sname, "display": sw["name"], "type": "enum", "options": sw["options"], "default": sw["default"],
-                "description": "%s, as MAME names it: '%s'. The machine reads it, so a movie needs the same value to play back. The default is MAME's." % (what, sw["name"]),
+                "name": sname, "display": text("setting.switch", "%1", sw["name"]), "type": "enum", "options": sw["options"],
+                "default": sw["default"],
+                "description": text("setting.switch.about", "%1, as MAME names it: '%2'. The machine reads it, so a movie needs "
+                                    "the same value to play back. The default is MAME's.", what, sw["name"]),
                 "when": []})["when"].append(name)
     settings += list(decls.values())
 
@@ -399,6 +436,7 @@ def main():
     with open(os.path.join(outdir, "default_keybinds.json"), "w") as f:
         json.dump(kb, f, indent=1, ensure_ascii=True)
         f.write("\n")
+    write_texts(os.path.join(outdir, "languages", "en.json"))
     print("machines %d, settings %d, firmware %d" % (len(machines), len(settings), len(config["firmware"])))
 
 

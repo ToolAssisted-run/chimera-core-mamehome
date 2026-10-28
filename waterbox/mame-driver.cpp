@@ -62,6 +62,15 @@
 #include <string>
 #include <vector>
 
+/* A text a person reads is a key of languages/en.json (chimera
+ * docs/translations.md): each of its arguments after a TEXT_ARG; a reason put
+ * inside another text separates its own with TEXT_INNER; a report of several
+ * texts puts TEXT_LINE before each. Each is a string of its own so the byte
+ * after it is never read as more of its hex. */
+#define TEXT_ARG "\x1f"
+#define TEXT_INNER "\x1e"
+#define TEXT_LINE "\x1d"
+
 namespace {
 
 constexpr int kSampleRate = 48000;
@@ -703,7 +712,7 @@ void apply_switches(running_machine &machine)
 	}
 	for (auto const &kv : s_switches)
 		if (!done.count(kv.first))
-			s_refused = "this game has no switch \"" + kv.first + "\" with a position \"" + kv.second + "\"";
+			s_refused = "error.no_switch_position" TEXT_ARG + kv.first + TEXT_ARG + kv.second;
 }
 
 // ---- what the machine keeps with the power off -----------------------------
@@ -736,13 +745,13 @@ void load_saves(running_machine &machine)
 		if (given == s_saves_in.end()) continue;
 		auto file = util::ram_read(given->second.data(), given->second.size());
 		if (!file || !nvram.nvram_load(*file))
-			s_refused = "the save data " + name + " could not be loaded into this machine";
+			s_refused = "error.save_not_loaded" TEXT_ARG + name;
 		used.insert(name);
 	}
 	for (auto const &given : s_saves_in)
 		if (!used.count(given.first))
-			s_refused = "the save data " + given.first + " is not one of this machine's ("
-				+ (have.empty() ? std::string("it keeps nothing") : "it keeps " + have) + ")";
+			s_refused = have.empty() ? "error.save_not_kept_none" TEXT_ARG + given.first
+				: "error.save_not_kept" TEXT_ARG + given.first + TEXT_ARG + have;
 }
 
 // ---- what one frame leaves behind ---------------------------------------
@@ -934,7 +943,7 @@ void mame_main()
 		s_machine = &machine;
 		int const result = machine.run(false);
 		if (s_error.empty())
-			s_error = "the machine stopped (MAME exit code " + std::to_string(result) + ")";
+			s_error = "error.mame_exit" TEXT_ARG + std::to_string(result);
 	}
 	catch (emu_fatalerror const &e)
 	{
@@ -945,7 +954,7 @@ void mame_main()
 		s_error = e.what();
 	}
 	if (!s_log.empty())
-		s_error += "\n" + s_log;
+		s_error += TEXT_LINE + s_log;
 	s_machine = nullptr;
 	s_stopped = true;
 	for (;;) co_switch(s_host);
@@ -954,7 +963,7 @@ void mame_main()
 void set(core_options &opts, const char *name, std::string const &value)
 {
 	if (!opts.get_entry(name))
-		throw std::runtime_error(std::string("MAME has no option \"") + name + "\"");
+		throw std::runtime_error("error.mame_option" TEXT_ARG + std::string(name));
 	opts.set_value(name, value, OPTION_PRIORITY_CMDLINE);
 }
 
@@ -1008,8 +1017,8 @@ bool takes_extension(device_image_interface const &image, std::string const &ext
 std::string status_text(game_driver const &driver, machine_config const &config)
 {
 	std::vector<std::string> parts;
-	if (driver.type.emulation_flags() & device_t::flags::NOT_WORKING) parts.emplace_back("MAME marks this machine as NOT WORKING");
-	if (driver.flags & MACHINE_MECHANICAL) parts.emplace_back("the machine has mechanical parts MAME does not show");
+	if (driver.type.emulation_flags() & device_t::flags::NOT_WORKING) parts.emplace_back("report.not_working");
+	if (driver.flags & MACHINE_MECHANICAL) parts.emplace_back("report.mechanical");
 	device_t::feature_type unemulated = device_t::feature::NONE, imperfect = device_t::feature::NONE;
 	for (device_t &device : device_enumerator(config.root_device()))
 	{
@@ -1023,11 +1032,11 @@ std::string status_text(game_driver const &driver, machine_config const &config)
 	};
 	for (auto const &n : names)
 	{
-		if (unemulated & n.bit) parts.push_back(std::string(n.name) + " not emulated");
-		else if (imperfect & n.bit) parts.push_back(std::string(n.name) + " imperfect");
+		if (unemulated & n.bit) parts.push_back(std::string("report.not_emulated.") + n.name);
+		else if (imperfect & n.bit) parts.push_back(std::string("report.imperfect.") + n.name);
 	}
 	std::string out;
-	for (auto const &p : parts) out += (out.empty() ? "" : "; ") + p;
+	for (auto const &p : parts) out += (out.empty() ? "" : TEXT_LINE) + p;
 	return out;
 }
 
@@ -1081,11 +1090,11 @@ extern "C" int mame_set_game(const char *name)
 	push_output();
 	s_game = name;
 	if (driver_list::find(name) >= 0) return 0;
-	s_error = "This core has no machine named \"" + s_game + "\". It has:";
+	std::string names;
 	for (size_t at = 0; at < driver_list::total(); at++)
 		if (std::strcmp(driver_list::driver(at).name, "___empty"))
-			s_error += std::string(at ? " " : "") + driver_list::driver(at).name;
-	s_error += ".";
+			names += std::string(names.empty() ? "" : " ") + driver_list::driver(at).name;
+	s_error = "error.no_machine_here" TEXT_ARG + s_game + TEXT_ARG + names;
 	return 1;
 }
 
@@ -1167,16 +1176,17 @@ std::vector<needed_file> audit(emu_options &options, game_driver const &driver, 
 				if (record->name() == f.name && record->type() != media_auditor::media_type::DISK) break;
 			if (record == records.end())
 			{
-				if (f.required) f.problem = "missing";
+				if (f.required) f.problem = "report.missing";
 			}
 			else
 			{
 				switch (record->substatus())
 				{
-				case media_auditor::audit_substatus::NOT_FOUND: if (f.required) f.problem = "missing"; break;
-				case media_auditor::audit_substatus::FOUND_BAD_CHECKSUM: f.problem = "found, but its contents are not the ones MAME expects"; break;
+				case media_auditor::audit_substatus::NOT_FOUND: if (f.required) f.problem = "report.missing"; break;
+				case media_auditor::audit_substatus::FOUND_BAD_CHECKSUM: f.problem = "report.bad_contents"; break;
 				case media_auditor::audit_substatus::FOUND_WRONG_LENGTH:
-					f.problem = util::string_format("found, but it is %d bytes and MAME expects %d", record->actual_length(), record->expected_length());
+					f.problem = "report.wrong_size" TEXT_INNER + std::to_string(record->actual_length()) + TEXT_INNER
+						+ std::to_string(record->expected_length());
 					break;
 				default: break;
 				}
@@ -1288,8 +1298,9 @@ static const char *report(bool wizard)
 {
 	static std::string out;
 	if (!s_desc.error.empty()) return (out = s_desc.error).c_str();
-	out = s_desc.title + ".";
-	if (!s_desc.status.empty()) out += " MAME's notes: " + s_desc.status + ".";
+	// a text each, a line each (TEXT_LINE)
+	out = "report.title" TEXT_ARG + s_desc.title;
+	if (!s_desc.status.empty()) out += TEXT_LINE + s_desc.status;
 	std::vector<needed_file const *> problems;
 	std::string names;
 	int required = 0;
@@ -1298,19 +1309,18 @@ static const char *report(bool wizard)
 		if (!f.required) continue;
 		required++;
 		names += (names.empty() ? "" : ", ") + f.name;
-		if (!f.problem.empty() && !(wizard && f.problem == "missing")) problems.push_back(&f);
+		if (!f.problem.empty() && !(wizard && f.problem == "report.missing")) problems.push_back(&f);
 	}
 	if (!required)
-		out += " This machine needs no firmware.";
+		out += TEXT_LINE "report.no_firmware";
 	else
-		out += " It reads " + std::to_string(required) + " firmware file" + (required == 1 ? "" : "s") + ": " + names + ".";
-	if (wizard && required) out += " The Firmware page asks for " + std::string(required == 1 ? "it" : "them") + ".";
+		out += TEXT_LINE "report.reads_firmware" TEXT_ARG + std::to_string(required) + TEXT_ARG + names;
+	if (wizard && required) out += TEXT_LINE "report.firmware_page_asks" TEXT_ARG + std::to_string(required);
 	if (!problems.empty())
 	{
-		out += " " + std::to_string(problems.size()) + (problems.size() == 1 ? " is" : " are") + " missing or wrong:";
-		for (size_t i = 0; i < problems.size(); i++)
-			out += std::string(i ? ";" : "") + " " + problems[i]->name + " - " + problems[i]->problem;
-		out += ".";
+		out += TEXT_LINE "report.problems" TEXT_ARG + std::to_string(problems.size());
+		for (needed_file const *f : problems)
+			out += TEXT_LINE "report.file_problem" TEXT_ARG + f->name + TEXT_ARG + f->problem;
 	}
 	return out.c_str();
 }
@@ -1431,7 +1441,7 @@ extern "C" int mame_init(void)
 		for (auto const &kv : s_options)
 			set(o, kv.first.c_str(), kv.second);
 		if (!o.system())
-			throw std::runtime_error("MAME has no machine named \"" + s_game + "\"");
+			throw std::runtime_error("error.no_machine_named" TEXT_ARG + s_game);
 		// the game's files, each into the first of the machine's media devices
 		// (a cartridge slot, a disk drive, a tape) that takes its extension and
 		// has none yet
@@ -1462,7 +1472,7 @@ extern "C" int mame_init(void)
 				if (is_ti_variable(ext) && config.root_device().subdevice("linkport"))
 				{
 					FILE *const f = std::fopen(file.c_str(), "rb");
-					if (!f) throw std::runtime_error("the file " + file + " could not be read");
+					if (!f) throw std::runtime_error("error.file_unreadable" TEXT_ARG + file);
 					std::vector<uint8_t> bytes;
 					uint8_t chunk[65536];
 					for (size_t got; (got = std::fread(chunk, 1, sizeof chunk, f)) > 0;)
@@ -1481,7 +1491,8 @@ extern "C" int mame_init(void)
 					placed = true;
 				}
 				if (!placed)
-					throw std::runtime_error("this machine has no place for " + file + ": it takes " + (takes.empty() ? std::string("no files") : takes));
+					throw std::runtime_error(takes.empty() ? "error.no_place_none" TEXT_ARG + file
+						: "error.no_place" TEXT_ARG + file + TEXT_ARG + takes);
 			}
 		}
 

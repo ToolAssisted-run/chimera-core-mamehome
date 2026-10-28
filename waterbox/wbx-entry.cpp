@@ -19,6 +19,11 @@
 
 #include "mame-driver.h"
 
+/* A text a person reads is a key of languages/en.json, each of its
+ * arguments after a TEXT_ARG (chimera docs/translations.md). TEXT_ARG is a
+ * string of its own so the byte after it is never read as more of its hex. */
+#define TEXT_ARG "\x1f"
+
 static char g_loadError[4096];
 static std::string g_suggestion;
 
@@ -29,7 +34,7 @@ static std::string JsonString(const std::string &s)
 	{
 		if (ch == '"' || ch == '\\') { out += '\\'; out += char(ch); }
 		else if (ch == '\n') out += "\\n";
-		else if (ch < 0x20) out += ' ';
+		else if (ch < 0x20) { char u[8]; snprintf(u, sizeof u, "\\u%04x", ch); out += u; }  /* the texts' 0x1F, 0x1E and 0x1D among them */
 		else out += char(ch);
 	}
 	return out + "\"";
@@ -122,7 +127,7 @@ ECL_EXPORT int Init(void)
 		if (wbx_setting_str(key.c_str(), val, sizeof val) <= 0) continue;
 		if (mame_apply_game_setting(key.c_str(), val) != 0)
 		{
-			snprintf(g_loadError, sizeof g_loadError, "setting %s: this machine has no value \"%s\"", key.c_str(), val);
+			snprintf(g_loadError, sizeof g_loadError, "error.bad_setting" TEXT_ARG "%s" TEXT_ARG "%s", key.c_str(), val);
 			return 0;
 		}
 	}
@@ -135,7 +140,7 @@ ECL_EXPORT int Init(void)
 		FILE *f = fopen(entry, "rb");
 		if (!f)
 		{
-			snprintf(g_loadError, sizeof g_loadError, "the save data %s could not be read", entry);
+			snprintf(g_loadError, sizeof g_loadError, "error.save_unreadable" TEXT_ARG "%s", entry);
 			return 0;
 		}
 		std::vector<uint8_t> bytes;

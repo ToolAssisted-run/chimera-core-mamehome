@@ -3,23 +3,23 @@
   "slots": [
     {
       "id": "game",
-      "title": "Game",
+      "title": "slot.game",
       "min": 1,
       "max": 20,
       "formats": [
         "a78", "bin", "int", "itv", "rom", "vec", "gam", "chf", "cpr", "dsk", "ipf", "cdt", "wav", "sna", "83p", "83g"
       ],
-      "help": "The game: a cartridge (.a78 for the Atari 7800; .int, .itv, .bin or .rom for the Intellivision; .vec, .gam or .bin for the Vectrex; .bin or .rom for the Odyssey 2; .chf or .bin for the Channel F; .cpr for the GX4000 and the CPC+), or for an Amstrad CPC a disk (.dsk), a tape (.cdt, .wav) or a snapshot (.sna), or for the TI-83 a program or a group of variables (.83p, .83g), which the core sends over the link cable a few seconds after power-on. Each file goes into the first of the machine's slots or drives that takes its kind. A CPC's disks are one list for its first drive, which starts with the first of them; Next Disk and Previous Disk put another in, and Eject Disk leaves the drive empty. Your files are never changed: Export Save Data writes out each disk the machine wrote to, under its own name, and a new project can take it as its game. The Machine setting says which machine it is."
+      "help": "slot.game.help"
     },
     {
       "id": "savedata",
-      "title": "Save data",
+      "title": "slot.savedata",
       "min": 0,
       "max": 16,
       "formats": [
         "nv"
       ],
-      "help": "What the machine keeps when the power is off, in the files Export Save Data wrote. Each file is put back into the device it came from before the first frame. With none, the machine starts as it left the factory."
+      "help": "slot.savedata.help"
     }
   ]
 }
