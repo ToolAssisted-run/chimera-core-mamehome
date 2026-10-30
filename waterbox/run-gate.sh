@@ -144,6 +144,24 @@ if [ "$ok" = 1 ]; then
 else
 	report FAIL "the declarations hold together" "$(tail -1 "$work/decl.log")"
 fi
+# every kind of file the README says a game can be is one the game's slot
+# lists: a kind it does not list is refused when the project is made (a BBC
+# Micro's .ssd was, chimera#422)
+python3 - "$root/README.md" "$here/file_slots.json" > "$work/kinds.log" 2>&1 <<'PY' && ok=1 || ok=0
+import json, re, sys
+section = open(sys.argv[1]).read().split("## What a project needs", 1)[1]
+game = section.split("- **The game**", 1)[1].split("\n- ", 1)[0]
+named = sorted(set(re.findall(r"`\.([a-z0-9]+)`", game)))
+listed = [s for s in json.load(open(sys.argv[2]))["slots"] if s["id"] == "game"][0]["formats"]
+missing = [k for k in named if k not in listed]
+assert named and not missing, "not in the game's slot: " + ", ".join(missing)
+print("%d kinds named, all in the game's slot" % len(named))
+PY
+if [ "$ok" = 1 ]; then
+	report PASS "every kind of game the README names is in its slot" "$(cat "$work/kinds.log")"
+else
+	report FAIL "every kind of game the README names is in its slot" "$(tail -1 "$work/kinds.log")"
+fi
 # every key the default bindings name is one Chimera sends (a binding to a
 # name it never sends never fires)
 if [ -f "$chimera_root/source/ui/qt/key_codes.inc" ]; then

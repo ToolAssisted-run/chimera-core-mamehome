@@ -7,7 +7,7 @@
       "min": 1,
       "max": 20,
       "formats": [
-        "a78", "bin", "int", "itv", "rom", "vec", "gam", "chf", "cpr", "dsk", "ipf", "cdt", "wav", "sna", "83p", "83g"
+        "a78", "bin", "int", "itv", "rom", "vec", "gam", "chf", "cpr", "dsk", "ipf", "cdt", "wav", "sna", "ssd", "dsd", "uef", "83p", "83g"
       ],
       "help": "slot.game.help"
     },

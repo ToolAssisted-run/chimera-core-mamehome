@@ -294,3 +294,18 @@ Tested: the gate's new check "intv: the wizard's note names the firmware and
 calls none missing" (an Intellivision folder without its GROM, asked as the
 window asks) fails with the old note and passes with the new; the gate: 79
 passed, 0 failed, 1 skipped (the BBC's own tests, no local folder).
+
+## The BBC Micro's discs and tapes are in the game's slot (2026-10-30, chimera#422)
+
+The README says a BBC Micro's game is a disc (`.ssd`, `.dsd`) or a tape
+(`.uef`), but the game's slot in `file_slots.json` did not list those kinds.
+Chimera's New Project window then offered them only under "All files", and
+Chimera refused the project when it was made, since a file of a kind its
+slot does not list is not taken. A person who picked a `.ssd` saw nothing
+happen (chimera#422; Chimera now says why, in its own repository).
+
+The slot now lists `.ssd`, `.dsd` and `.uef`. A new test in the test script
+reads the kinds the README names for the game and checks each is in the
+slot; with the old slot it fails, naming dsd, ssd and uef.
+
+Not tried: a BBC Micro with its ROMs, as before (no Acorn ROMs here).
