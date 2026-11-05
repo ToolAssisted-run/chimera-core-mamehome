@@ -2,6 +2,11 @@
   "coreName": "MAME Home Systems",
   "author": "The MAME team; chimera port by Sergio Martin",
   "url": "https://github.com/ToolAssisted-run/chimera-core-mamehome",
+  "runsOn": [
+    "windows-x86_64",
+    "linux-x86_64",
+    "macos-x86_64"
+  ],
   "romFile": "game",
   "deterministic": true,
   "suggestSettings": true,
