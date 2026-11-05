@@ -146,6 +146,9 @@ case "$flavor" in
 			"$mbuild/source/guest/cxxglue.c.o" "$mbuild/source/guest/emulibc.c.o" \
 			-Wl,--start-group $libs -Wl,--end-group \
 			-L"$sr/lib" -lstdc++ -lgcc -lgcc_eh -lc
+		# where the code reads its thread pointer, listed in the image: an Intel Mac
+		# rewrites those reads as the core loads (miniBox's wbx-tp-rewrite.py)
+		python3 "$mb/source/guest/wbx-tp-rewrite.py" "$bin/core.wbx"
 		sh "$mb/source/guest/check-wbx.sh" "$bin/core.wbx"
 		mbhost="$mb/build/meson-linux/source/host"
 		gcc -O2 -Wall -I"$mb/source/host" -I"$here" -o "$bin/run-wbx" "$here/run-wbx.c" \
