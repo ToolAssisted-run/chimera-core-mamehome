@@ -39,7 +39,10 @@ jobs:
 
   tests:
     name: tests (builds, package, GX4000)
-    runs-on: ubuntu-latest
+    # Ubuntu 24.04, not ubuntu-latest: on GitHub's 26.04 image GCC builds for
+    # x86-64-v3 (AVX2, FMA) by default, so a core built there would not run
+    # on an older processor and would round floating point differently
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v6
